@@ -1,15 +1,23 @@
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui";
 import { ChatClient } from "@/components/chat-client";
+import { Sparkles } from "lucide-react";
 
 export default function ChatPage() {
   return (
     <AppShell>
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div>
-          <Badge className="bg-white">视频问答</Badge>
-          <h1 className="mt-3 text-3xl font-semibold tracking-normal">视频知识库问答</h1>
-          <p className="mt-2 text-sm text-muted-foreground">询问过去收藏过的视频，系统会检索相关内容并用中文回答。</p>
+      <div className="mx-auto max-w-5xl space-y-7">
+        <div className="text-center">
+          <Badge className="border-accent/30 bg-white text-foreground">
+            <Sparkles size={13} />
+            Ask Memory
+          </Badge>
+          <h1 className="mx-auto mt-5 max-w-3xl text-5xl font-black leading-[0.95] tracking-normal sm:text-7xl">
+            Chat with your video memory
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-muted-foreground">
+            询问过去收藏过的视频，VideoMind 会从你的记忆库里找回相关片段，再生成中文回答。
+          </p>
         </div>
         <ChatClient />
       </div>

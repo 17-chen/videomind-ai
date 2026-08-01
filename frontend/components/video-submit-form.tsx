@@ -56,7 +56,7 @@ export function VideoSubmitForm() {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-        添加到知识库
+        添加到我的记忆
       </Button>
     </form>
   );

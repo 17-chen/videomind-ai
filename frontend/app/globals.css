@@ -3,15 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --background: 42 33% 97%;
-  --foreground: 218 24% 12%;
-  --muted: 210 18% 92%;
-  --muted-foreground: 217 10% 42%;
-  --border: 214 16% 84%;
-  --primary: 172 65% 29%;
+  --background: 0 0% 98%;
+  --foreground: 0 0% 7%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 47%;
+  --border: 0 0% 90%;
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
-  --accent: 31 90% 58%;
-  --accent-foreground: 218 24% 12%;
+  --accent: 334 89% 66%;
+  --accent-foreground: 0 0% 7%;
+  --violet: 270 76% 68%;
   --destructive: 0 72% 48%;
 }
 
@@ -21,15 +22,14 @@
 
 html {
   background: hsl(var(--background));
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   color: hsl(var(--foreground));
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(249, 247, 242, 0.92)),
-    hsl(var(--background));
+  background: #fafafa;
 }
 
 a {
@@ -46,4 +46,33 @@ textarea {
 ::selection {
   color: hsl(var(--primary-foreground));
   background: hsl(var(--primary));
+}
+
+.page-enter {
+  animation: page-enter 420ms ease both;
+}
+
+.memory-surface {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72)),
+    #ffffff;
+}
+
+.ai-constellation {
+  background-image:
+    radial-gradient(circle at 16px 16px, rgba(255, 92, 151, 0.3) 0 2px, transparent 2.5px),
+    linear-gradient(135deg, rgba(17, 17, 17, 0.04) 0 1px, transparent 1px);
+  background-size: 44px 44px, 28px 28px;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

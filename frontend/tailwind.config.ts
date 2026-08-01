@@ -19,10 +19,12 @@ const config: Config = {
         "primary-foreground": "hsl(var(--primary-foreground))",
         accent: "hsl(var(--accent))",
         "accent-foreground": "hsl(var(--accent-foreground))",
+        violet: "hsl(var(--violet))",
         destructive: "hsl(var(--destructive))"
       },
       boxShadow: {
-        panel: "0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06)"
+        panel: "0 18px 50px rgba(17, 17, 17, 0.07), 0 1px 0 rgba(17, 17, 17, 0.03)",
+        float: "0 28px 80px rgba(17, 17, 17, 0.12)"
       }
     }
   },
