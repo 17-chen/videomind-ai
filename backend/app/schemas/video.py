@@ -49,7 +49,10 @@ class VideoRead(BaseModel):
     description: str | None = Field(title="描述")
     duration: int | None = Field(title="视频时长", description="单位：秒。")
     thumbnail: str | None = Field(title="封面图")
-    status: str = Field(title="处理状态", description="机器字段，取值为 queued / processing / completed / failed。")
+    status: str = Field(
+        title="处理状态",
+        description="机器字段，表示 created / downloading / transcribing / analyzing / embedding / completed / failed。",
+    )
     source: str | None = Field(title="视频来源", description="例如 bilibili、douyin、youtube、tiktok。")
     tags: list[str] = Field(title="标签")
     processing_error: str | None = Field(title="处理错误")

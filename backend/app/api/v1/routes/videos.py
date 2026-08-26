@@ -4,12 +4,19 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user, get_db
 from app.core.i18n import t
 from app.models.user import User
+from app.models.video import VideoStatus
 from app.schemas.rag import VideoEmbedResponse
 from app.schemas.video import VideoAnalyzeResponse, VideoCreate, VideoListResponse, VideoProcessResponse, VideoRead
 from app.services.analysis import analyze_video as analyze_video_summary
 from app.services.rag import index_video
 from app.services.video_processing.pipeline import process_video_by_id
-from app.services.videos import create_video, get_video_for_user, list_videos_for_user, mark_video_processing
+from app.services.videos import (
+    create_video,
+    get_video_for_user,
+    list_videos_for_user,
+    mark_video_processing,
+    update_video_status,
+)
 
 router = APIRouter()
 
@@ -106,7 +113,14 @@ def analyze_video(
     current_user: User = Depends(get_current_user),
 ) -> VideoAnalyzeResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    summary = analyze_video_summary(db=db, video=video)
+    update_video_status(db, video, VideoStatus.ANALYZING)
+    try:
+        summary = analyze_video_summary(db=db, video=video)
+    except Exception as exc:
+        db.rollback()
+        update_video_status(db, video, VideoStatus.FAILED, str(exc))
+        raise
+    update_video_status(db, video, VideoStatus.COMPLETED)
     return VideoAnalyzeResponse(id=video.id, summary=summary)
 
 
@@ -122,5 +136,12 @@ def embed_video(
     current_user: User = Depends(get_current_user),
 ) -> VideoEmbedResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    embedding = index_video(db=db, video=video)
+    update_video_status(db, video, VideoStatus.EMBEDDING)
+    try:
+        embedding = index_video(db=db, video=video)
+    except Exception as exc:
+        db.rollback()
+        update_video_status(db, video, VideoStatus.FAILED, str(exc))
+        raise
+    update_video_status(db, video, VideoStatus.COMPLETED)
     return VideoEmbedResponse(id=video.id, vector_id=embedding.vector_id, message=t("video_indexed"))

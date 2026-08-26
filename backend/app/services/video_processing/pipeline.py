@@ -44,6 +44,9 @@ def process_video(db: Session, video: Video) -> Video:
         if subtitle_result is not None:
             transcript_content = subtitle_result.content
         else:
+            video.status = VideoStatus.TRANSCRIBING.value
+            db.add(video)
+            db.commit()
             audio = extract_audio(video_path=downloaded.file_path, video_id=video.id)
             video.audio_path = audio.file_path
             db.add(video)

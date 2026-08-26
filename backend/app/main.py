@@ -15,7 +15,12 @@ from app.database.session import create_database_tables
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     logger.info("Starting {}", settings.app_name)
-    create_database_tables()
+    if settings.auto_create_database_tables:
+        if settings.is_production:
+            logger.warning("AUTO_CREATE_DATABASE_TABLES is enabled in production; use Alembic migrations instead")
+        create_database_tables()
+    else:
+        logger.info("Skipping automatic table creation; database schema is managed by Alembic")
     yield
     logger.info("Stopping {}", settings.app_name)
 

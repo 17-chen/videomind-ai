@@ -17,6 +17,11 @@ def create_database_tables() -> None:
     ensure_development_schema()
 
 
+def check_database_connection() -> None:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+
+
 def ensure_development_schema() -> None:
     """Keep the MVP database usable before Alembic migrations are introduced."""
     statements = [

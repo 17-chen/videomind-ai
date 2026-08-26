@@ -9,8 +9,13 @@ from app.models.mixins import IdMixin, TimestampMixin
 
 
 class VideoStatus(StrEnum):
+    CREATED = "created"
     QUEUED = "queued"
     PROCESSING = "processing"
+    DOWNLOADING = "downloading"
+    TRANSCRIBING = "transcribing"
+    ANALYZING = "analyzing"
+    EMBEDDING = "embedding"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -24,7 +29,7 @@ class Video(IdMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
     thumbnail: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), default=VideoStatus.QUEUED.value, index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default=VideoStatus.CREATED.value, index=True, nullable=False)
     source: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     media_path: Mapped[str | None] = mapped_column(Text, nullable=True)

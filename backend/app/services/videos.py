@@ -16,7 +16,7 @@ def create_video(db: Session, user: User, payload: VideoCreate) -> Video:
         url=str(payload.url),
         title=payload.title,
         description=payload.description,
-        status=VideoStatus.QUEUED.value,
+        status=VideoStatus.CREATED.value,
         source=detect_video_source(str(payload.url)),
         tags=payload.tags,
     )
@@ -27,11 +27,32 @@ def create_video(db: Session, user: User, payload: VideoCreate) -> Video:
 
 
 def mark_video_processing(db: Session, video: Video) -> Video:
-    if video.status == VideoStatus.PROCESSING.value:
+    active_statuses = {
+        VideoStatus.PROCESSING.value,
+        VideoStatus.DOWNLOADING.value,
+        VideoStatus.TRANSCRIBING.value,
+        VideoStatus.ANALYZING.value,
+        VideoStatus.EMBEDDING.value,
+    }
+    if video.status in active_statuses:
         raise ApiError(t("video_already_processing"), status_code=status.HTTP_409_CONFLICT)
 
-    video.status = VideoStatus.PROCESSING.value
+    video.status = VideoStatus.DOWNLOADING.value
     video.processing_error = None
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+    return video
+
+
+def update_video_status(
+    db: Session,
+    video: Video,
+    video_status: VideoStatus,
+    processing_error: str | None = None,
+) -> Video:
+    video.status = video_status.value
+    video.processing_error = processing_error[:4000] if processing_error else None
     db.add(video)
     db.commit()
     db.refresh(video)

@@ -23,6 +23,7 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 - **Phase 4：AI 视频分析 Agent 基础实现**
 - **Phase 5：RAG 问答基础实现**
 - **Phase 6：前端 UI 基础实现**
+- **Phase 7：本地生产化基础（进行中）**
 
 已完成内容：
 
@@ -250,6 +251,26 @@ postgresql+psycopg://videomind:videomind_dev_password@localhost:5432/videomind
 - [API 规划](docs/api.md)
 - [项目书](docs/project-plan.md)
 - [当前自查记录](docs/self-review.md)
+- [分阶段任务路线图](docs/roadmap.md)
+- [部署审计报告](docs/deployment-audit.md)
+
+## 数据库迁移
+
+新环境使用 Alembic 创建和升级数据库结构：
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+本地开发默认保留 `AUTO_CREATE_DATABASE_TABLES=true`，方便首次启动。生产环境必须设置为 `false`，并在应用启动前执行 `alembic upgrade head`。
+
+如果本地数据库已经由旧版本自动建表且结构与当前模型一致，可以先备份数据，再执行：
+
+```bash
+cd backend
+alembic stamp head
+```
 
 FastAPI 的 OpenAPI 文档会在 Phase 2 后端启动后开放：
 

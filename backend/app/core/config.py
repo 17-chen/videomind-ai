@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 10080
 
     database_url: str = "postgresql+psycopg://videomind:videomind_dev_password@postgres:5432/videomind"
+    auto_create_database_tables: bool = True
 
     chroma_host: str = "chroma"
     chroma_port: int = 8000
@@ -58,6 +59,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.backend_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() == "production"
 
 
 @lru_cache

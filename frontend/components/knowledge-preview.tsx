@@ -1,4 +1,4 @@
-import { Bot, FileText, Network, PlaySquare, Search } from "lucide-react";
+import { FileText, Network, PlaySquare, Search } from "lucide-react";
 import { Badge, Panel } from "@/components/ui";
 
 const rows = [
