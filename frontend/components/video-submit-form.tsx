@@ -1,12 +1,15 @@
 "use client";
 
+import { useTranslator } from "@/lib/language";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Loader2, Plus } from "lucide-react";
 import { Button, Input, Textarea } from "@/components/ui";
 import { createVideo } from "@/lib/api";
+import { extractShareTitle, extractVideoUrl } from "@/lib/video-url";
 
 export function VideoSubmitForm() {
+  const tx = useTranslator();
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -18,10 +21,15 @@ export function VideoSubmitForm() {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const videoUrl = extractVideoUrl(url);
+    if (!videoUrl) {
+      setError(tx("没有识别到有效链接，请粘贴以 http:// 或 https:// 开头的视频地址。"));
+      return;
+    }
     setLoading(true);
     try {
       const video = await createVideo({
-        url,
+        url: videoUrl,
         title: title || undefined,
         description: description || undefined,
         tags: tags
@@ -32,9 +40,37 @@ export function VideoSubmitForm() {
       router.refresh();
       router.push(`/videos/${video.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "提交失败");
+      setError(err instanceof Error ? err.message : tx("提交失败"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  function onPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedText = event.clipboardData.getData("text");
+    const videoUrl = extractVideoUrl(pastedText);
+    if (!videoUrl) return;
+
+    event.preventDefault();
+    setUrl(videoUrl);
+    setError("");
+    if (!title) {
+      setTitle(extractShareTitle(pastedText, videoUrl));
+    }
+  }
+
+  function onUrlChange(value: string) {
+    const videoUrl = extractVideoUrl(value);
+    const isShareText = Boolean(videoUrl) && value.trim() !== videoUrl && /\s/.test(value.trim());
+    if (!videoUrl || !isShareText) {
+      setUrl(value);
+      return;
+    }
+
+    setUrl(videoUrl);
+    setError("");
+    if (!title) {
+      setTitle(extractShareTitle(value, videoUrl));
     }
   }
 
@@ -45,18 +81,20 @@ export function VideoSubmitForm() {
         <Input
           required
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => onUrlChange(event.target.value)}
+          onPaste={onPaste}
+          inputMode="url"
           className="pl-9"
-          placeholder="粘贴 Bilibili 或抖音视频链接"
+          placeholder={tx("粘贴 Bilibili 或抖音视频链接")}
         />
       </div>
-      <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="标题，可选" />
-      <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="标签，用空格或逗号分隔" />
-      <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="备注，可选" />
+      <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={tx("标题，可选")} />
+      <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder={tx("标签，用空格或逗号分隔")} />
+      <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tx("备注，可选")} />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-        添加到我的记忆
+        {tx("添加到我的记忆")}
       </Button>
     </form>
   );

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from fastapi import status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.errors import ApiError
 from app.core.i18n import t
 from app.models.embedding import Embedding
@@ -61,14 +60,14 @@ def index_video(db: Session, video: Video) -> Embedding:
     return embedding
 
 
-def chat_with_videos(db: Session, user: User, question: str, limit: int) -> RagChatResult:
+def chat_with_videos(db: Session, user: User, question: str, limit: int, language: str = "zh") -> RagChatResult:
     _ = db
     results = vector_store.query_video_documents(user_id=user.id, query=question, limit=limit)
     if not results:
-        return RagChatResult(answer=t("no_relevant_videos"), sources=[])
+        return RagChatResult(answer="No relevant videos found in your library yet." if language == "en" else t("no_relevant_videos"), sources=[])
 
     sources = [_to_chat_source(result) for result in results]
-    answer = generate_rag_answer(question=question, results=results)
+    answer = generate_rag_answer(user=user, question=question, results=results, language=language)
     return RagChatResult(answer=answer, sources=sources)
 
 
@@ -104,7 +103,7 @@ def build_video_document(video: Video) -> str:
     return "\n\n".join(chunks)
 
 
-def generate_rag_answer(question: str, results: list[VectorSearchResult]) -> str:
+def generate_rag_answer(user: User, question: str, results: list[VectorSearchResult], language: str = "zh") -> str:
     context_blocks = []
     for index, result in enumerate(results, start=1):
         context_blocks.append(
@@ -120,16 +119,17 @@ def generate_rag_answer(question: str, results: list[VectorSearchResult]) -> str
         )
 
     prompt = "\n\n".join(context_blocks)
-    client = get_llm_client()
+    client, model = get_llm_client(user)
+    response_language = "English" if language == "en" else "中文"
     response = client.chat.completions.create(
-        model=settings.llm_model,
+        model=model,
         temperature=0.2,
         messages=[
             {
                 "role": "system",
                 "content": (
                     "你是 VideoMind AI 的个人视频知识库助手。"
-                    "你必须只基于用户已收藏视频资料回答，使用中文，"
+                    f"你必须只基于用户已收藏视频资料回答，使用{response_language}，"
                     "结论清晰，必要时引用视频标题。"
                 ),
             },

@@ -1,6 +1,10 @@
 from datetime import datetime
+import re
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+
+
+VIDEO_URL_PATTERN = re.compile(r"https?://[^\s<>'\"，。；]+", re.IGNORECASE)
 
 
 class VideoCreate(BaseModel):
@@ -8,6 +12,16 @@ class VideoCreate(BaseModel):
     title: str | None = Field(default=None, max_length=500, title="标题", description="可选，未填写时由视频处理 Pipeline 自动补充。")
     description: str | None = Field(default=None, title="描述", description="可选的视频备注或原始描述。")
     tags: list[str] = Field(default_factory=list, max_length=20, title="标签", description="用户手动添加的视频标签。")
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def extract_url_from_share_text(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        match = VIDEO_URL_PATTERN.search(value)
+        if match is None:
+            return value
+        return match.group(0).rstrip(")]}〉》」』、，。！？；：")
 
 
 class TranscriptRead(BaseModel):

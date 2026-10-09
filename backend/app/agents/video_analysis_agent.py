@@ -5,8 +5,8 @@ from typing import Any, TypedDict
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
-from app.core.config import settings
 from app.core.i18n import t
+from app.models.user import User
 from app.services.ai_provider import get_llm_client
 from app.services.video_processing.errors import VideoProcessingError
 
@@ -35,12 +35,14 @@ class VideoAnalysisState(TypedDict):
     video_title: str | None
     analysis: dict[str, Any]
     markdown_note: str
+    user: User
 
 
-def analyze_video_transcript(transcript: str, video_title: str | None = None) -> tuple[VideoAnalysisResult, str]:
+def analyze_video_transcript(transcript: str, user: User, video_title: str | None = None) -> tuple[VideoAnalysisResult, str]:
     graph = _build_graph()
     state = graph.invoke(
         {
+            "user": user,
             "transcript": transcript,
             "video_title": video_title,
             "analysis": {},
@@ -53,22 +55,22 @@ def analyze_video_transcript(transcript: str, video_title: str | None = None) ->
 
 def _build_graph():
     workflow = StateGraph(VideoAnalysisState)
-    workflow.add_node("analysis", _analysis_node)
-    workflow.add_node("markdown", _markdown_node)
-    workflow.set_entry_point("analysis")
-    workflow.add_edge("analysis", "markdown")
-    workflow.add_edge("markdown", END)
+    workflow.add_node("analyze_transcript", _analysis_node)
+    workflow.add_node("render_markdown", _markdown_node)
+    workflow.set_entry_point("analyze_transcript")
+    workflow.add_edge("analyze_transcript", "render_markdown")
+    workflow.add_edge("render_markdown", END)
     return workflow.compile()
 
 
 def _analysis_node(state: VideoAnalysisState) -> VideoAnalysisState:
-    client = get_llm_client()
+    client, model = get_llm_client(state["user"])
     prompt = _load_prompt("analysis_prompt.txt")
     title_context = f"视频原始标题：{state['video_title']}\n\n" if state.get("video_title") else ""
 
     try:
         response = client.chat.completions.create(
-            model=settings.llm_model,
+            model=model,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"{title_context}Transcript:\n{state['transcript']}"},

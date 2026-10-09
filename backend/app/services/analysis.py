@@ -17,6 +17,7 @@ def analyze_video(db: Session, video: Video) -> Summary:
 
     analysis, markdown_note = analyze_video_transcript(
         transcript=video.transcript.content,
+        user=video.user,
         video_title=video.title,
     )
     _persist_markdown_note(video_id=video.id, markdown_note=markdown_note)
@@ -24,6 +25,7 @@ def analyze_video(db: Session, video: Video) -> Summary:
     summary = video.summary
     if summary is None:
         summary = Summary(video_id=video.id, summary=analysis.summary)
+        video.summary = summary
 
     summary.title = analysis.title
     summary.summary = analysis.summary

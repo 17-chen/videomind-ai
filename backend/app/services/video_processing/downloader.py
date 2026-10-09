@@ -31,14 +31,32 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
         "subtitlesformat": "vtt/srt/best",
         "socket_timeout": 30,
         "retries": 3,
+        "http_headers": {
+            "User-Agent": settings.video_user_agent,
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Referer": _referer_for_url(url),
+        },
     }
+    if settings.video_cookie_file:
+        cookie_file = Path(settings.video_cookie_file)
+        if not cookie_file.is_file():
+            raise VideoProcessingError(f"Cookie 文件不存在：{cookie_file}")
+        options["cookiefile"] = str(cookie_file)
+    if settings.video_http_proxy:
+        options["proxy"] = settings.video_http_proxy
 
     try:
         with YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
             prepared_path = Path(ydl.prepare_filename(info))
     except Exception as exc:
-        raise VideoProcessingError(f"{t('video_download_failed')}: {exc}") from exc
+        message = str(exc)
+        if detect_video_source(url) == "bilibili" and "HTTP Error 412" in message:
+            raise VideoProcessingError(
+                "Bilibili 拒绝了当前下载请求（HTTP 412）。请导出 Netscape 格式登录 Cookie，"
+                "保存到 storage/cookies/bilibili.txt，并设置 VIDEO_COOKIE_FILE=/app/storage/cookies/bilibili.txt。"
+            ) from exc
+        raise VideoProcessingError(f"{t('video_download_failed')}: {message}") from exc
 
     file_path = _resolve_downloaded_file(prepared_path, output_dir, video_id)
 
@@ -71,3 +89,11 @@ def _string_or_none(value: object) -> str | None:
 
 def _int_or_none(value: object) -> int | None:
     return value if isinstance(value, int) else None
+
+
+def _referer_for_url(url: str) -> str:
+    if detect_video_source(url) == "bilibili":
+        return "https://www.bilibili.com/"
+    if detect_video_source(url) == "douyin":
+        return "https://www.douyin.com/"
+    return url

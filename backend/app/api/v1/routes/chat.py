@@ -13,14 +13,14 @@ router = APIRouter()
     "",
     response_model=ChatResponse,
     summary="和我的视频知识库对话",
-    description="基于 ChromaDB 检索当前用户相关视频内容，并调用 DeepSeek 生成中文回答。",
+    description="检索当前用户的视频资料，并使用该用户配置的模型生成回答。",
 )
 def chat(
     payload: ChatRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ChatResponse:
-    result = chat_with_videos(db=db, user=current_user, question=payload.question, limit=payload.limit)
+    result = chat_with_videos(db=db, user=current_user, question=payload.question, limit=payload.limit, language=payload.language)
     return ChatResponse(
         answer=result.answer,
         sources=[ChatSource(**source.__dict__) for source in result.sources],

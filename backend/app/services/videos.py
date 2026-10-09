@@ -1,5 +1,5 @@
 from fastapi import status
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.errors import ApiError
@@ -26,23 +26,32 @@ def create_video(db: Session, user: User, payload: VideoCreate) -> Video:
     return video
 
 
-def mark_video_processing(db: Session, video: Video) -> Video:
-    active_statuses = {
-        VideoStatus.PROCESSING.value,
-        VideoStatus.DOWNLOADING.value,
-        VideoStatus.TRANSCRIBING.value,
-        VideoStatus.ANALYZING.value,
-        VideoStatus.EMBEDDING.value,
-    }
-    if video.status in active_statuses:
-        raise ApiError(t("video_already_processing"), status_code=status.HTTP_409_CONFLICT)
+ACTIVE_VIDEO_STATUSES = (
+    VideoStatus.PROCESSING.value,
+    VideoStatus.DOWNLOADING.value,
+    VideoStatus.TRANSCRIBING.value,
+    VideoStatus.ANALYZING.value,
+    VideoStatus.EMBEDDING.value,
+)
 
-    video.status = VideoStatus.DOWNLOADING.value
-    video.processing_error = None
-    db.add(video)
+
+def claim_video_operation(db: Session, video: Video, next_status: VideoStatus) -> Video:
+    """Atomically claim a video so duplicate requests cannot start concurrent jobs."""
+    result = db.execute(
+        update(Video)
+        .where(Video.id == video.id, Video.user_id == video.user_id, Video.status.not_in(ACTIVE_VIDEO_STATUSES))
+        .values(status=next_status.value, processing_error=None)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise ApiError(t("video_already_processing"), status_code=status.HTTP_409_CONFLICT)
     db.commit()
     db.refresh(video)
     return video
+
+
+def mark_video_processing(db: Session, video: Video) -> Video:
+    return claim_video_operation(db, video, VideoStatus.DOWNLOADING)
 
 
 def update_video_status(

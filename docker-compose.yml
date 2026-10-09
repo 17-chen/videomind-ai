@@ -21,6 +21,7 @@ services:
 
   chroma:
     image: chromadb/chroma:0.5.23
+    profiles: ["remote-chroma"]
     container_name: videomind-chroma
     restart: unless-stopped
     ports:
@@ -56,10 +57,13 @@ services:
       - .env
     ports:
       - "${API_PORT:-8000}:8000"
+    dns:
+      - 223.5.5.5
+      - 1.1.1.1
     volumes:
       - ./backend:/app
       - ./storage:/app/storage
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "python -m scripts.migrate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +71,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: development
     container_name: videomind-frontend
     profiles: ["app"]
     env_file:

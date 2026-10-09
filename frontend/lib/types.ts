@@ -1,3 +1,19 @@
+export type AiSettings = {
+  provider: "deepseek" | "openai" | null;
+  model: string | null;
+  has_api_key: boolean;
+  has_asr_api_key: boolean;
+  demo_mode: boolean;
+};
+
+export type AiSettingsWrite = {
+  provider: "deepseek" | "openai";
+  model: string;
+  api_key?: string;
+  asr_api_key?: string;
+  clear_asr_api_key?: boolean;
+};
+
 export type Transcript = {
   id: string;
   content: string;

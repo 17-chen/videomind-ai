@@ -1,3 +1,4 @@
+from app.models.ai_settings import AiSettings  # noqa: F401
 from app.models.embedding import Embedding
 from app.models.summary import Summary
 from app.models.transcript import Transcript

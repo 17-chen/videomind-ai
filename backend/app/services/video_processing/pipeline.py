@@ -2,7 +2,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError
 from app.core.logging import logger
+from app.services.ai_settings import resolve_asr_key
 from app.database.session import SessionLocal
 from app.models.transcript import Transcript
 from app.models.video import Video, VideoStatus
@@ -22,11 +24,13 @@ def process_video_by_id(video_id: str) -> None:
             return
 
         process_video(db=db, video=video)
+    except Exception as exc:
+        logger.error("Background video processing stopped for {}: {}", video_id, exc)
     finally:
         db.close()
 
 
-def process_video(db: Session, video: Video) -> Video:
+def process_video(db: Session, video: Video, final_status: VideoStatus = VideoStatus.COMPLETED) -> Video:
     logger.info("Starting video processing pipeline for {}", video.id)
 
     try:
@@ -52,12 +56,12 @@ def process_video(db: Session, video: Video) -> Video:
             db.add(video)
             db.commit()
 
-            transcript_result = transcribe_audio(audio_path=audio.file_path, video_id=video.id)
+            transcript_result = transcribe_audio(audio_path=audio.file_path, video_id=video.id, api_key=resolve_asr_key(video.user))
             transcript_content = transcript_result.content
 
         transcript = _upsert_transcript(db=db, video=video, content=transcript_content)
 
-        video.status = VideoStatus.COMPLETED.value
+        video.status = final_status.value
         video.processing_error = None
         video.processed_at = datetime.now(UTC)
         db.add(transcript)
@@ -66,11 +70,14 @@ def process_video(db: Session, video: Video) -> Video:
         db.refresh(video)
         logger.info("Completed video processing pipeline for {}", video.id)
         return video
+    except ApiError as exc:
+        _mark_failed(db=db, video=video, message=exc.message)
+        raise
     except VideoProcessingError as exc:
         _mark_failed(db=db, video=video, message=str(exc))
         raise
-    except Exception as exc:
-        _mark_failed(db=db, video=video, message=f"Unexpected processing error: {exc}")
+    except Exception:
+        _mark_failed(db=db, video=video, message="处理失败，请检查设置或稍后重试")
         raise
 
 
@@ -78,6 +85,7 @@ def _upsert_transcript(db: Session, video: Video, content: str) -> Transcript:
     transcript = video.transcript
     if transcript is None:
         transcript = Transcript(video_id=video.id, content=content)
+        video.transcript = transcript
     else:
         transcript.content = content
 

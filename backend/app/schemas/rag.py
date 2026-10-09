@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -10,6 +11,7 @@ class VideoEmbedResponse(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000, title="问题")
     limit: int = Field(default=5, ge=1, le=10, title="检索数量")
+    language: Literal["zh", "en"] = "zh"
 
 
 class ChatSource(BaseModel):

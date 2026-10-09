@@ -4,6 +4,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+FROM dependencies AS development
+
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY . .
+
+CMD ["npm", "run", "dev"]
+
 FROM node:22-alpine AS builder
 
 WORKDIR /app

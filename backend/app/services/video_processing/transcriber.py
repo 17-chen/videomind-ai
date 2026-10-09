@@ -8,19 +8,19 @@ from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import TranscriptResult
 
 
-def transcribe_audio(audio_path: str, video_id: str) -> TranscriptResult:
-    if settings.asr_provider == "disabled":
+def transcribe_audio(audio_path: str, video_id: str, api_key: str | None = None) -> TranscriptResult:
+    if settings.asr_provider == "disabled" and not api_key:
         raise VideoProcessingError(t("asr_disabled"))
-    if settings.asr_provider != "openai":
+    if settings.asr_provider not in ("openai", "disabled"):
         raise VideoProcessingError(f"暂不支持的音频转写服务: {settings.asr_provider}")
-    if not settings.openai_api_key:
+    if not api_key:
         raise VideoProcessingError(t("openai_key_required"))
 
     input_path = Path(audio_path)
     if not input_path.exists():
         raise VideoProcessingError(f"{t('audio_file_missing')}: {audio_path}")
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = OpenAI(api_key=api_key)
 
     try:
         with input_path.open("rb") as audio_file:

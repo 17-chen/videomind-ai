@@ -10,9 +10,10 @@ httpx==0.28.1
 openai==1.59.7
 langgraph==0.2.60
 chromadb==0.5.23
-yt-dlp==2024.12.23
+yt-dlp==2026.8.19
 loguru==0.7.3
 python-jose[cryptography]==3.3.0
+cryptography>=44,<47
 passlib[bcrypt]==1.7.4
 pytest==8.3.4
 ruff==0.8.4

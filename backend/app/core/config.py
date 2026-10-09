@@ -17,9 +17,15 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 10080
 
+    auth_mode: str = "demo"
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+
     database_url: str = "postgresql+psycopg://videomind:videomind_dev_password@postgres:5432/videomind"
     auto_create_database_tables: bool = True
 
+    chroma_mode: str = "embedded"
+    chroma_persist_dir: str = "/app/storage/chroma"
     chroma_host: str = "chroma"
     chroma_port: int = 8000
     chroma_collection: str = "videomind_videos"
@@ -33,6 +39,7 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-v4-flash"
 
     deepseek_api_key: str = ""
+    user_api_key_encryption_key: str = ""
 
     embedding_provider: str = "local_hash"
     embedding_dimensions: int = 384
@@ -48,6 +55,12 @@ class Settings(BaseSettings):
     max_upload_mb: int = 1024
     video_download_timeout_seconds: int = 1800
     audio_extraction_timeout_seconds: int = 900
+    video_cookie_file: str = ""
+    video_http_proxy: str = ""
+    video_user_agent: str = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -63,6 +76,15 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def uses_supabase_auth(self) -> bool:
+        mode = self.auth_mode.lower()
+        if mode == "supabase":
+            return True
+        if mode == "demo" and not self.is_production:
+            return False
+        raise RuntimeError("AUTH_MODE 必须为 supabase；demo 仅允许在非生产环境使用")
 
 
 @lru_cache

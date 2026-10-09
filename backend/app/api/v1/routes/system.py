@@ -2,8 +2,13 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
 from app.database.session import check_database_connection
+from app.services.vector_store import vector_store
 
 router = APIRouter()
+
+
+def check_vector_store_connection() -> None:
+    vector_store.check_connection()
 
 
 @router.get("/health", summary="API 健康检查", description="检查 API v1 服务是否正常运行。")
@@ -16,7 +21,7 @@ def liveness_check() -> dict[str, str]:
     return {"status": "ok", "service": settings.app_name}
 
 
-@router.get("/health/ready", summary="就绪检查", description="检查 API 与 PostgreSQL 是否已经可以接收业务请求。")
+@router.get("/health/ready", summary="就绪检查", description="检查 PostgreSQL 与向量库是否已就绪。")
 def readiness_check() -> dict[str, str]:
     try:
         check_database_connection()
@@ -25,4 +30,11 @@ def readiness_check() -> dict[str, str]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="数据库尚未就绪",
         ) from exc
-    return {"status": "ready", "database": "ok"}
+    try:
+        check_vector_store_connection()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="向量知识库尚未就绪",
+        ) from exc
+    return {"status": "ready", "database": "ok", "vector_store": "ok"}

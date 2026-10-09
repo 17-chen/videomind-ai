@@ -5,13 +5,15 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 项目核心流程：
 
 ```text
-视频链接或本地上传
--> 获取视频信息、下载视频或提取音频、获取字幕或 Whisper 转写
+视频 URL（本地上传待实现）
+-> 下载并获取字幕；无字幕时按 ASR 配置转写（当前默认关闭）
 -> 使用 LLM 理解视频内容
 -> 生成结构化 Markdown 笔记
 -> 存入个人视频知识库
 -> 基于 RAG 实现 Chat With My Videos
 ```
+
+> 项目资料建议先读：[文档入口](docs/PROJECT_MATERIALS.md) · [当前状态](PROJECT_CONTEXT.md) · [项目交接](PROJECT_HANDOFF.md) · [阶段路线图](docs/roadmap.md)。以下 README 中早期阶段描述以这些当前核对文档为准。
 
 ## 当前阶段
 
@@ -23,21 +25,24 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 - **Phase 4：AI 视频分析 Agent 基础实现**
 - **Phase 5：RAG 问答基础实现**
 - **Phase 6：前端 UI 基础实现**
-- **Phase 7：本地生产化基础（进行中）**
+- **Phase 7：本地生产化基础已实现，真实视频闭环待验收**
+- **Sprint 02：Supabase 用户系统接入中，代码尚未提交及运行验收**
 
 已完成内容：
 
 - 使用 monorepo 组织前端、后端、文档和本地存储目录。
-- 前端规划为 Next.js 15、React、TypeScript、Tailwind CSS、shadcn/ui。
+- 前端使用 Next.js 16.3.3、React 19、TypeScript 和 Tailwind CSS。
 - 后端规划为 Python FastAPI、SQLAlchemy、PostgreSQL。
-- 使用 Docker Compose 管理 PostgreSQL、ChromaDB、Adminer。
-- 实现 URL 视频下载、字幕优先解析、音频提取、Whisper fallback 的后端 Pipeline。
+- 使用 Docker Compose 管理 PostgreSQL、Adminer 和应用服务；本地 Chroma 默认嵌入后端，独立服务按需启用。
+- 实现 URL 视频下载、字幕优先解析和音频提取；ASR 默认为关闭，暂无可用的本地转写 fallback。
 - 实现 DeepSeek 视频分析 Agent、Markdown 笔记生成、ChromaDB 写入和 Chat With My Videos API。
 - 实现中文优先的 Next.js 前端：工作台、知识库、视频详情、视频问答和快速添加入口。
 - 提供 `.env.example` 作为环境变量模板。
 - 提供后端和前端 Dockerfile。
 - 提供架构文档和 API 规划文档。
 - 预留视频、音频、转写文本、笔记和临时文件目录。
+
+视频详情可一键处理字幕、生成 AI 笔记并写入知识库，也可分别执行各阶段；失败后的一键重试复用已完成阶段。此流程目前由本地 BackgroundTasks 执行，真实视频与服务商调用尚未验收。
 
 后续阶段会继续做 UI 视觉精修、文件上传、本地 ASR 和更强的中文向量模型。
 
@@ -83,15 +88,14 @@ videomind-ai/
 └── .gitignore
 ```
 
-## 技术栈规划
+## 当前技术栈
 
 ### Frontend
 
-- Next.js 15
-- React
+- Next.js 16.3.3
+- React 19
 - TypeScript
-- Tailwind CSS
-- shadcn/ui
+- Tailwind CSS 与项目内 UI 组件
 
 ### Backend
 
@@ -125,12 +129,32 @@ videomind-ai/
 cp .env.example .env
 ```
 
+### 用户认证模式
+
+本地默认使用演示用户，不需要注册即可开发：
+
+```env
+AUTH_MODE=demo
+```
+
+接入 Supabase 后，在 `.env` 填写以下配置并重启前后端：
+
+```env
+AUTH_MODE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-public-anon-key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+```
+
+后端使用 `SUPABASE_URL` 和 `SUPABASE_ANON_KEY` 向 Supabase Auth 验证用户令牌；前端使用 `NEXT_PUBLIC_` 变量。两侧必须指向同一个项目。登录和注册页面位于 `http://localhost:3000/auth`。
+
 ## Docker 命令说明
 
 启动 Phase 1 的基础设施：
 
 ```bash
-docker compose up -d postgres chroma adminer
+docker compose up -d postgres adminer
 ```
 
 这条命令的意思是：
@@ -138,7 +162,7 @@ docker compose up -d postgres chroma adminer
 - `docker compose`：读取当前目录下的 `docker-compose.yml`。
 - `up`：创建并启动服务。
 - `-d`：后台运行，也叫 detached mode，所以终端不会一直打印日志。
-- `postgres chroma adminer`：只启动这三个基础设施服务，不启动还没正式实现的 frontend/backend 应用服务。
+- `postgres adminer`：启动数据库和管理界面；本地向量库默认嵌入后端并持久化到 `storage/chroma/`，无需单独启动 Chroma 容器。
 
 如果你运行后“没有反应”，通常有几种情况：
 
@@ -194,7 +218,9 @@ docker compose down
 docker compose down -v
 ```
 
-## 开发路线图
+## 初始开发路线图
+
+下列内容是早期规划；当前验收状态请以 [阶段路线图](docs/roadmap.md) 为准。
 
 1. **Phase 1：项目初始化**
    - 项目目录设计
@@ -292,7 +318,7 @@ Phase 2 已实现：
 - `POST /api/v1/videos/{id}/embed`
 - `POST /api/v1/chat`
 
-当前阶段先使用 demo user 自动创建用户记录，正式认证系统会在后续 SaaS 用户体系中接入。
+当前默认使用 demo user；Supabase 认证代码正在接入，真实配置和多用户隔离尚待验收。
 
 启动完整后端服务：
 
@@ -383,4 +409,16 @@ npm run build
 
 ## GitHub 状态
 
-当前项目仍处于早期开发阶段，已完成项目初始化、后端基础 API、视频处理 Pipeline、AI Agent、RAG 基础闭环和前端基础 UI。后续会继续提交视觉精修、文件上传、本地 ASR 和生产级任务队列。
+本地仓库已实现前后端基础功能和 Phase 7 生产化基础，真实视频端到端流程与 Supabase 用户系统尚待验收。最新 Git 和运行状态见 [项目上下文](PROJECT_CONTEXT.md)。
+
+## 用户语言与自带模型密钥（2026-10-08）
+
+网站右上角可切换中文和英文；`/settings` 为产品设置页。截图中的英文 Preferences 属于 Next.js 开发工具，已通过 `devIndicators: false` 从本地预览隐藏。
+
+登录用户可以在 `/settings` 选择 DeepSeek 或 OpenAI、自填 Chat Completions 模型名和 API Key，并可另填 OpenAI 音频转写 Key。后端把密钥用 `USER_API_KEY_ENCRYPTION_KEY` 加密后存入 PostgreSQL；读取接口只返回是否已设置，密钥不会回传浏览器。分析、视频问答和缺字幕时的转写按当前用户的配置调用服务商，费用由用户在各自的服务商账户承担。已认证用户没有密钥时会得到设置提示，不会使用项目所有者的 `.env` Key。服务商地址由后端固定，用户不能填写任意 URL。
+
+生成一次 Fernet Key 并保存在未提交的 `.env` 中；之后不要轮换或丢失，否则已保存的用户密钥无法解密。生产环境需要先配置 `AUTH_MODE=supabase`、两端 Supabase 环境变量，再执行 Alembic 迁移。当前本地 `demo` 模式所有访问者共用同一演示账户，设置页只供预览，API 拒绝保存个人密钥；不要作为开放注册服务使用。真实 Supabase 双用户登录、服务商真实计费与视频全链路仍待验收。
+
+## 本地向量库（2026-10-08）
+
+默认 `CHROMA_MODE=embedded`，后端使用 Chroma PersistentClient，数据保存在已挂载的 `storage/chroma/`，不用拉取单独的 Chroma 镜像。`/api/v1/health/ready` 同时检查 PostgreSQL 和向量库。需要独立服务时，在 `.env` 设置 `CHROMA_MODE=http` 并运行 `docker compose --profile remote-chroma up -d chroma`；生产环境应使用服务端向量库和持久卷。嵌入式模式只面向本地单实例开发。

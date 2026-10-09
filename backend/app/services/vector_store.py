@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 from fastapi import status
 
 from app.core.config import settings
@@ -25,12 +26,20 @@ class VectorSearchResult:
 
 class ChromaVectorStore:
     def __init__(self) -> None:
-        self._client: chromadb.HttpClient | None = None
+        self._client: Any | None = None
 
     def _collection(self) -> Any:
         try:
             if self._client is None:
-                self._client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+                if settings.chroma_mode == "embedded":
+                    self._client = chromadb.PersistentClient(
+                        path=settings.chroma_persist_dir,
+                        settings=ChromaSettings(anonymized_telemetry=False),
+                    )
+                elif settings.chroma_mode == "http":
+                    self._client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+                else:
+                    raise ValueError("CHROMA_MODE must be embedded or http")
             return self._client.get_or_create_collection(
                 name=settings.chroma_collection,
                 metadata={"hnsw:space": "cosine"},
@@ -38,6 +47,10 @@ class ChromaVectorStore:
         except Exception as exc:
             logger.exception("Failed to connect ChromaDB")
             raise ApiError(t("chroma_unavailable"), status.HTTP_503_SERVICE_UNAVAILABLE) from exc
+
+    def check_connection(self) -> None:
+        self._collection()
+        self._client.heartbeat()
 
     def upsert_video_document(
         self,

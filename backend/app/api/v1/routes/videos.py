@@ -7,10 +7,13 @@ from app.models.user import User
 from app.models.video import VideoStatus
 from app.schemas.rag import VideoEmbedResponse
 from app.schemas.video import VideoAnalyzeResponse, VideoCreate, VideoListResponse, VideoProcessResponse, VideoRead
+from app.services.ai_settings import resolve_llm
 from app.services.analysis import analyze_video as analyze_video_summary
 from app.services.rag import index_video
 from app.services.video_processing.pipeline import process_video_by_id
+from app.services.video_workflow import run_video_workflow_by_id
 from app.services.videos import (
+    claim_video_operation,
     create_video,
     get_video_for_user,
     list_videos_for_user,
@@ -102,6 +105,27 @@ def process_video(
 
 
 @router.post(
+    "/{video_id}/run",
+    response_model=VideoProcessResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="一键处理视频并写入知识库",
+    description="依次完成字幕处理、AI 分析和向量写入；失败后重试会复用已有转写和笔记。",
+)
+def run_video(
+    video_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoProcessResponse:
+    video = get_video_for_user(db=db, user=current_user, video_id=video_id)
+    if video.summary is None:
+        resolve_llm(current_user)
+    video = claim_video_operation(db, video, VideoStatus.PROCESSING)
+    background_tasks.add_task(run_video_workflow_by_id, video.id, current_user.id)
+    return VideoProcessResponse(id=video.id, status=video.status, message="已开始完整处理，页面会自动更新进度")
+
+
+@router.post(
     "/{video_id}/analyze",
     response_model=VideoAnalyzeResponse,
     summary="启动 AI 分析",
@@ -113,12 +137,13 @@ def analyze_video(
     current_user: User = Depends(get_current_user),
 ) -> VideoAnalyzeResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    update_video_status(db, video, VideoStatus.ANALYZING)
+    resolve_llm(current_user)
+    claim_video_operation(db, video, VideoStatus.ANALYZING)
     try:
         summary = analyze_video_summary(db=db, video=video)
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        update_video_status(db, video, VideoStatus.FAILED, str(exc))
+        update_video_status(db, video, VideoStatus.FAILED, "AI 分析失败，请检查模型设置或服务商额度")
         raise
     update_video_status(db, video, VideoStatus.COMPLETED)
     return VideoAnalyzeResponse(id=video.id, summary=summary)
@@ -136,12 +161,12 @@ def embed_video(
     current_user: User = Depends(get_current_user),
 ) -> VideoEmbedResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    update_video_status(db, video, VideoStatus.EMBEDDING)
+    claim_video_operation(db, video, VideoStatus.EMBEDDING)
     try:
         embedding = index_video(db=db, video=video)
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        update_video_status(db, video, VideoStatus.FAILED, str(exc))
+        update_video_status(db, video, VideoStatus.FAILED, "知识库写入失败，请检查服务状态")
         raise
     update_video_status(db, video, VideoStatus.COMPLETED)
     return VideoEmbedResponse(id=video.id, vector_id=embedding.vector_id, message=t("video_indexed"))

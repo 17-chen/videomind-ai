@@ -1,12 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useLanguage, useTranslator } from "@/lib/language";
 import { ArrowUpRight, Clock, ExternalLink, Play } from "lucide-react";
 import type { Video } from "@/lib/types";
 import { Badge, EmptyState, Panel } from "@/components/ui";
-import { formatDate, sourceLabel, statusLabel } from "@/lib/utils";
+import { formatDate, sourceLabel, videoStageLabel } from "@/lib/utils";
 
 export function VideoList({ videos }: { videos: Video[] }) {
+  const tx = useTranslator();
+  const { language } = useLanguage();
   if (!videos.length) {
-    return <EmptyState title="还没有视频" description="先添加一个视频链接，VideoMind AI 会把它变成可整理、可检索的知识资产。" />;
+    return <EmptyState title={tx("还没有视频")} description={tx("先添加视频链接，再到详情页依次处理、分析并写入知识库。")} />;
   }
 
   return (
@@ -28,18 +33,18 @@ export function VideoList({ videos }: { videos: Video[] }) {
 
             <div className="min-w-0 space-y-3">
               <Link href={`/videos/${video.id}`} className="block text-2xl font-black leading-tight hover:text-accent">
-                {video.summary?.title ?? video.title ?? "Untitled Memory"}
+                {video.summary?.title ?? video.title ?? tx("Untitled Memory")}
               </Link>
               <p className="line-clamp-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                 {video.summary?.summary ?? video.description ?? video.url}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-white">{sourceLabel(video.source)}</Badge>
-                <Badge className="bg-white">{statusLabel(video.status)}</Badge>
+                <Badge className="bg-white">{tx(videoStageLabel(video))}</Badge>
                 {video.summary?.category ? <Badge className="border-accent/30 bg-accent/10 text-foreground">{video.summary.category}</Badge> : null}
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock size={13} />
-                  {formatDate(video.created_at)}
+                  {formatDate(video.created_at, language)}
                 </span>
                 {video.tags.slice(0, 3).map((tag) => (
                   <span key={tag} className="text-xs text-muted-foreground">
@@ -57,7 +62,7 @@ export function VideoList({ videos }: { videos: Video[] }) {
             >
               <ExternalLink size={15} className="md:hidden" />
               <ArrowUpRight size={16} className="hidden md:block" />
-              原视频
+              {tx("原视频")}
             </a>
           </div>
         </Panel>

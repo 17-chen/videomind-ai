@@ -2,18 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Circle, LayoutDashboard, Library, PlaySquare, Search } from "lucide-react";
+import { Bot, Circle, LayoutDashboard, Library, PlaySquare, Settings } from "lucide-react";
+import { AuthStatus } from "@/components/auth-status";
+import { LanguageSwitch } from "@/components/language-switch";
+import { useTranslator } from "@/lib/language";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "首页", icon: LayoutDashboard },
   { href: "/dashboard", label: "工作台", icon: PlaySquare },
   { href: "/library", label: "知识库", icon: Library },
-  { href: "/chat", label: "视频问答", icon: Bot }
+  { href: "/chat", label: "视频问答", icon: Bot },
+  { href: "/settings", label: "设置", icon: Settings }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const tx = useTranslator();
 
   return (
     <div className="min-h-screen pb-20 md:pb-0">
@@ -26,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
             <span>
               <span className="block text-sm font-bold leading-4">VideoMind</span>
-              <span className="block text-xs text-muted-foreground">AI Video Memory</span>
+              <span className="block text-xs text-muted-foreground">{tx("AI Video Memory")}</span>
             </span>
           </Link>
           <nav className="hidden items-center gap-1 rounded-full border border-border bg-white/82 p-1 shadow-panel md:flex">
@@ -43,23 +48,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <Icon size={16} />
-                  {item.label}
+                  {tx(item.label)}
                 </Link>
               );
             })}
           </nav>
-          <Link
-            href="/library"
-            className="hidden h-11 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-semibold text-foreground shadow-panel transition hover:-translate-y-0.5 hover:shadow-float sm:inline-flex"
-          >
-            <Search size={16} />
-            Search memory
-          </Link>
+          <div className="flex items-center gap-2"><LanguageSwitch /><AuthStatus /></div>
         </div>
       </header>
       <main className="page-enter mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       <nav className="fixed inset-x-3 bottom-3 z-30 rounded-full border border-border bg-white/90 px-2 py-2 shadow-float backdrop-blur-xl md:hidden">
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-6 gap-1">
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;
@@ -73,10 +72,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <Icon size={17} />
-                {item.label}
+                {tx(item.label)}
               </Link>
             );
           })}
+          <AuthStatus mobile />
         </div>
       </nav>
     </div>
