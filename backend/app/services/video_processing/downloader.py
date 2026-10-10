@@ -8,6 +8,9 @@ from app.services.video_processing.types import DownloadedVideo
 from app.services.videos import detect_video_source
 
 
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".mov", ".m4v", ".flv", ".avi", ".ts", ".3gp"}
+
+
 def download_video(url: str, video_id: str) -> DownloadedVideo:
     try:
         from yt_dlp import YoutubeDL
@@ -73,11 +76,13 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
 
 
 def _resolve_downloaded_file(prepared_path: Path, output_dir: Path, video_id: str) -> Path:
-    candidates = [prepared_path, prepared_path.with_suffix(".mp4")]
-    candidates.extend(output_dir.glob(f"{video_id}.*"))
+    candidates = [output_dir / f"{video_id}.mp4", prepared_path.with_suffix(".mp4"), prepared_path]
+    candidates.extend(
+        sorted(output_dir.glob(f"{video_id}.*"), key=lambda path: (path.suffix.lower() != ".mp4", path.name))
+    )
 
     for candidate in candidates:
-        if candidate.exists() and candidate.is_file():
+        if candidate.suffix.lower() in VIDEO_EXTENSIONS and candidate.is_file():
             return candidate
 
     raise VideoProcessingError(t("video_output_missing"))
