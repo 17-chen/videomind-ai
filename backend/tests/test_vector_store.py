@@ -21,3 +21,9 @@ def test_embedded_chroma_persists_and_filters_users(monkeypatch, tmp_path):
     assert [item.video_id for item in alice_results] == ["alice"]
     assert [item.video_id for item in bob_results] == ["bob"]
     assert alice_results[0].document == "linear algebra vectors matrix"
+
+    restarted.delete_video_document(vector_id="video:alice", user_id="bob")
+    assert [item.video_id for item in restarted.query_video_documents(user_id="alice", query="linear algebra", limit=5)] == ["alice"]
+    restarted.delete_video_document(vector_id="video:alice", user_id="alice")
+    assert restarted.query_video_documents(user_id="alice", query="linear algebra", limit=5) == []
+    assert [item.video_id for item in restarted.query_video_documents(user_id="bob", query="linear algebra", limit=5)] == ["bob"]

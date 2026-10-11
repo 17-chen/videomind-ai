@@ -66,6 +66,8 @@ export const translations: Record<string, [string, string]> = {
   "加载失败": ["加载失败", "Could not load"],
   "保存失败": ["保存失败", "Could not save"],
   "删除失败": ["删除失败", "Could not delete"],
+  "删除视频": ["删除视频", "Delete video"],
+  "确定删除这条视频、笔记和知识库内容吗？此操作无法撤销。": ["确定删除这条视频、笔记和知识库内容吗？此操作无法撤销。", "Delete this video, its notes, and its library entry? This cannot be undone."],
   "待处理": ["待处理", "Ready to process"],
   "排队中": ["排队中", "Queued"],
   "处理中": ["处理中", "Processing"],

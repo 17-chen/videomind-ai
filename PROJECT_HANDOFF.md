@@ -1,6 +1,6 @@
 # VideoMind AI 项目交接
 
-> 生成：2026-10-08。供一段时间未开发后恢复工作；以本地代码和当时的实测结果为准。
+> 更新：2026-10-11。供一段时间未开发后恢复工作；以本地代码和当时的实测结果为准。
 
 ## 项目介绍
 
@@ -10,12 +10,12 @@
 
 - Phase 1–6 的基础实现已有代码：项目骨架、视频 API、字幕优先处理、AI 分析、RAG 基础和中文前端。
 - Phase 7 的 Alembic、生产构建和健康检查基础此前已验证；真实视频全流程仍待验收。
-- 当前 Sprint 02：Supabase 认证与用户隔离。2026-10-08 已补 Auth 服务校验、邮箱冲突保护、页面会话刷新与退出入口；代码尚未提交，也没有接入真实 Supabase 项目。
+- 当前 Sprint 02：Supabase 认证与用户隔离。2026-10-08 已补 Auth 服务校验、邮箱冲突保护、页面会话刷新与退出入口；认证代码已随 `8f8047d` 提交，仍没有接入真实 Supabase 项目。
 - 代码仓库：`/Users/chenxin/Documents/Codex 2/videomind-ai`；Git remote 为 `git@github.com:17-chen/videomind-ai.git`。
 
 ## 2026-10-08 工作树快照
 
-- 当前分支 `main`；本地最近提交 `1de8974`，日期 2026-08-26，标题 `Build Phase 7 production foundations`。
+- 当前分支 `main`；本地最近提交 `8f8047d`，日期 2026-10-09；2026-10-09 以后的删除功能及核查修复尚未提交。
 - 开始本轮开发前有 37 个已修改或未跟踪的文件，主要是 2026-09-04 的认证基础、分享文本解析和配套文档；本轮又增加了认证和文档改动。不要在没有核对 diff 前执行清理、重置或覆盖。
 - `.env` 在本地且不提交；当前未配置 Supabase，`AUTH_MODE` 未设置，因此使用默认 `demo`。DeepSeek Key 在本地被检测为已设置；本文不记录其值。
 
@@ -61,7 +61,7 @@ cd '/Users/chenxin/Documents/Codex 2/videomind-ai'
 git status --short --branch
 git diff --check
 git log -5 --oneline
-curl --max-time 5 http://localhost:8000/health
+curl --max-time 5 http://localhost:8001/api/v1/health/ready
 DOCKER_HOST=unix:///Users/chenxin/.colima/default/docker.sock docker compose ps
 ```
 
@@ -80,3 +80,7 @@ DOCKER_HOST=unix:///Users/chenxin/.colima/default/docker.sock docker compose ps
 ## 2026-10-08 一键处理更新
 
 `POST /api/v1/videos/{id}/run` 与详情页按钮已串联字幕、分析、入库。测试用模拟下载、模型和向量库验证首次写入失败后重试只重做入库；24 项后端测试通过。真实视频、真实模型服务商和 Supabase 双用户仍待验收。后台为单进程 BackgroundTasks，重启后不会自动恢复挂起任务。
+
+## 2026-10-11 恢复提示
+
+本机另一 Python 项目占用了 `127.0.0.1:8000`。VideoMind 本地 `.env` 已将宿主机 API 改为 8001，前端浏览器 API 地址同步改为 8001；容器内部 API 仍为 8000。不要用 `localhost:8000` 的健康响应判断 VideoMind 状态，先检查 `/openapi.json` 是否有 `/api/v1/videos`。本轮 29 项后端测试、全量 Ruff、前端 typecheck/lint/build 及本地 CRUD 冒烟通过；真实 Supabase 和付费模型仍未验收。详见 [运行与功能核查](docs/VERIFICATION_2026-10-11.md)。

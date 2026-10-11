@@ -28,6 +28,8 @@ FastAPI /api/v1
 
 视频详情现在也可调用 `POST /videos/{id}/run`，由单个 BackgroundTask 依次执行上述三步；重复启动通过数据库状态原子校验拒绝，失败后重试复用已保存的转写与笔记。这个任务不具备跨进程或重启后的恢复能力。状态枚举包括 created、queued、processing、downloading、transcribing、analyzing、embedding、completed、failed；“有状态字段”不等于每个阶段均经真实视频验证。
 
+视频删除使用 `DELETE /videos/{id}`：先锁定本人且非处理中的记录，以视频 ID 和 user_id 清理 Chroma，随后删除数据库记录与关联内容，最后清理本地生成文件。向量库不可用时会保留数据库记录；跨存储尚无原子事务，数据库失败后可重新索引。
+
 ## 模块和数据
 
 | 层 | 主要文件 | 当前职责 |

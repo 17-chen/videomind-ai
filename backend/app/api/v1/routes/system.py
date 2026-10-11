@@ -37,4 +37,4 @@ def readiness_check() -> dict[str, str]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="向量知识库尚未就绪",
         ) from exc
-    return {"status": "ready", "database": "ok", "vector_store": "ok"}
+    return {"status": "ready", "service": settings.app_name, "database": "ok", "vector_store": "ok"}

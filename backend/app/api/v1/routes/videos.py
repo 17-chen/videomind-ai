@@ -15,6 +15,7 @@ from app.services.video_workflow import run_video_workflow_by_id
 from app.services.videos import (
     claim_video_operation,
     create_video,
+    delete_video_for_user,
     get_video_for_user,
     list_videos_for_user,
     mark_video_processing,
@@ -83,6 +84,20 @@ def get_video_detail(
 ) -> VideoRead:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     return VideoRead.model_validate(video)
+
+
+@router.delete(
+    "/{video_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除我的视频",
+    description="删除当前用户的视频记录、知识库向量及本地生成文件。处理中的视频不能删除。",
+)
+def delete_video(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    delete_video_for_user(db=db, user=current_user, video_id=video_id)
 
 
 @router.post(

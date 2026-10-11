@@ -203,8 +203,10 @@ docker compose up -d postgres adminer
 服务启动后可以访问：
 
 - PostgreSQL: `localhost:5432`
-- ChromaDB: `http://localhost:8001`
+- VideoMind API: `http://localhost:${API_PORT:-8000}`；本机若将 `API_PORT` 设为 `8001`，API 在 `http://localhost:8001`。嵌入式 Chroma 没有独立 HTTP 地址。
 - Adminer: `http://localhost:8080`
+
+如果 `localhost:8000` 已被其他程序占用，在本地 `.env` 中同时设置 `API_PORT=8001` 与 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8001/api/v1`，然后重建 backend 和 frontend；`INTERNAL_API_BASE_URL` 仍指向容器内 `backend:8000`。下面的命令示例使用默认 8000 端口，本机覆盖端口时相应改为 8001。
 
 停止服务：
 

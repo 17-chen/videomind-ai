@@ -51,12 +51,13 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
             video.status = VideoStatus.TRANSCRIBING.value
             db.add(video)
             db.commit()
+            asr_key = resolve_asr_key(video.user)
             audio = extract_audio(video_path=downloaded.file_path, video_id=video.id)
             video.audio_path = audio.file_path
             db.add(video)
             db.commit()
 
-            transcript_result = transcribe_audio(audio_path=audio.file_path, video_id=video.id, api_key=resolve_asr_key(video.user))
+            transcript_result = transcribe_audio(audio_path=audio.file_path, video_id=video.id, api_key=asr_key)
             transcript_content = transcript_result.content
 
         transcript = _upsert_transcript(db=db, video=video, content=transcript_content)

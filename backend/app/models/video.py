@@ -1,11 +1,18 @@
-from enum import StrEnum
 from datetime import datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 from app.models.mixins import IdMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.embedding import Embedding
+    from app.models.summary import Summary
+    from app.models.transcript import Transcript
+    from app.models.user import User
 
 
 class VideoStatus(StrEnum):

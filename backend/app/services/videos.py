@@ -1,13 +1,18 @@
+from pathlib import Path
+
 from fastapi import status
 from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import settings
 from app.core.errors import ApiError
+from app.core.logging import logger
 from app.core.i18n import t
 from app.models.summary import Summary
 from app.models.user import User
 from app.models.video import Video, VideoStatus
 from app.schemas.video import VideoCreate
+from app.services.vector_store import vector_store
 
 
 def create_video(db: Session, user: User, payload: VideoCreate) -> Video:
@@ -108,6 +113,39 @@ def get_video_for_user(db: Session, user: User, video_id: str) -> Video:
     if video is None:
         raise ApiError(t("video_not_found"), status_code=status.HTTP_404_NOT_FOUND)
     return video
+
+
+def delete_video_for_user(db: Session, user: User, video_id: str) -> None:
+    video = db.scalar(
+        _base_video_query(user.id).where(Video.id == video_id).with_for_update()
+    )
+    if video is None:
+        raise ApiError(t("video_not_found"), status_code=status.HTTP_404_NOT_FOUND)
+    if video.status in ACTIVE_VIDEO_STATUSES:
+        raise ApiError(t("video_already_processing"), status_code=status.HTTP_409_CONFLICT)
+
+    # Keep the database row until the user's Chroma entry has been removed.
+    # The vector ID is deterministic, so this also cleans up an index whose DB write failed.
+    vector_store.delete_video_document(vector_id=f"video:{video.id}", user_id=user.id)
+    db.delete(video)
+    db.commit()
+    _cleanup_video_files(video_id)
+
+
+def _cleanup_video_files(video_id: str) -> None:
+    # Only touch files named from our generated video ID inside configured storage roots.
+    for directory in (
+        settings.video_storage_dir,
+        settings.audio_storage_dir,
+        settings.transcript_storage_dir,
+        settings.note_storage_dir,
+    ):
+        for path in Path(directory).glob(f"{video_id}.*"):
+            if path.is_file() or path.is_symlink():
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    logger.warning("Could not remove generated video file {}: {}", path, type(exc).__name__)
 
 
 def detect_video_source(url: str) -> str | None:

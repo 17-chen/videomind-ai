@@ -73,6 +73,10 @@ export async function createVideo(payload: { url: string; title?: string; descri
   });
 }
 
+export async function deleteVideo(id: string) {
+  return request<void>(`/videos/${id}`, { method: "DELETE" });
+}
+
 export async function runVideo(id: string) {
   return request<{ id: string; status: string; message: string }>(`/videos/${id}/run`, {
     method: "POST"

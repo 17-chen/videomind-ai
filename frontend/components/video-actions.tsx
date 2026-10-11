@@ -4,9 +4,9 @@ import { useTranslator } from "@/lib/language";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bot, Database, Loader2, WandSparkles } from "lucide-react";
+import { Bot, Database, Loader2, Trash2, WandSparkles } from "lucide-react";
 import { Button, SecondaryButton } from "@/components/ui";
-import { analyzeVideo, embedVideo, processVideo, runVideo } from "@/lib/api";
+import { analyzeVideo, deleteVideo, embedVideo, processVideo, runVideo } from "@/lib/api";
 import type { Video } from "@/lib/types";
 import { videoStageLabel } from "@/lib/utils";
 
@@ -41,6 +41,20 @@ export function VideoActions({ video }: { video: ActionVideo }) {
     }
   }
 
+  async function remove() {
+    if (!window.confirm(tx("确定删除这条视频、笔记和知识库内容吗？此操作无法撤销。"))) return;
+    setLoading("delete");
+    setMessage("");
+    try {
+      await deleteVideo(video.id);
+      router.push("/library");
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : tx("删除失败"));
+      setLoading(null);
+    }
+  }
+
   const busy = loading !== null || active;
   return (
     <div className="space-y-3">
@@ -67,6 +81,10 @@ export function VideoActions({ video }: { video: ActionVideo }) {
           {tx("写入知识库")}
         </SecondaryButton>
       </div>
+      <SecondaryButton type="button" onClick={remove} disabled={busy} className="w-full border-destructive/30 text-destructive hover:border-destructive">
+        {loading === "delete" ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+        {tx("删除视频")}
+      </SecondaryButton>
       {!video.transcript && !active ? <p className="text-xs leading-5 text-muted-foreground">{tx("先处理视频，获得字幕或转写文本后才能分析。")}</p> : null}
       {video.status === "failed" && video.processing_error ? <p className="rounded-[20px] border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-6 text-destructive">{video.processing_error}</p> : null}
       {message ? <p className="rounded-[20px] border border-border bg-white px-4 py-3 text-sm leading-6 text-muted-foreground">{message}</p> : null}

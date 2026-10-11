@@ -42,7 +42,7 @@ def test_readiness_check(monkeypatch) -> None:
     response = client.get("/api/v1/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ready", "database": "ok", "vector_store": "ok"}
+    assert response.json() == {"status": "ready", "service": "VideoMind AI", "database": "ok", "vector_store": "ok"}
 
 
 def test_readiness_check_reports_database_failure(monkeypatch) -> None:

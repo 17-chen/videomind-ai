@@ -81,6 +81,9 @@ class ChromaVectorStore:
             ],
         )
 
+    def delete_video_document(self, *, vector_id: str, user_id: str) -> None:
+        self._collection().delete(ids=[vector_id], where={"user_id": user_id})
+
     def query_video_documents(self, *, user_id: str, query: str, limit: int) -> list[VectorSearchResult]:
         collection = self._collection()
         response = collection.query(
