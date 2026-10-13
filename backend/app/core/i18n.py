@@ -20,7 +20,7 @@ ZH_CN_MESSAGES: dict[str, str] = {
     "audio_extraction_timeout": "音频提取超时",
     "audio_extraction_failed": "音频提取失败",
     "audio_output_missing": "音频提取失败，没有生成输出文件",
-    "asr_disabled": "当前未启用音频转写服务。请优先使用带字幕的视频，或后续配置本地 ASR。",
+    "asr_disabled": "当前未启用音频转写服务。请使用带字幕的视频，或配置本地转写。",
     "openai_key_required": "需要配置 OPENAI_API_KEY 才能使用 OpenAI Whisper 转写",
     "audio_file_missing": "音频文件不存在",
     "whisper_failed": "Whisper 转写失败",

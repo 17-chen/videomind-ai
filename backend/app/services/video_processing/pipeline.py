@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import ApiError
 from app.core.logging import logger
 from app.services.ai_settings import resolve_asr_key
@@ -12,7 +13,7 @@ from app.services.video_processing.audio import extract_audio
 from app.services.video_processing.downloader import download_video
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.subtitles import find_downloaded_subtitles
-from app.services.video_processing.transcriber import transcribe_audio
+from app.services.video_processing.transcriber import ensure_local_asr_available, transcribe_audio
 
 
 def process_video_by_id(video_id: str) -> None:
@@ -51,7 +52,11 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
             video.status = VideoStatus.TRANSCRIBING.value
             db.add(video)
             db.commit()
-            asr_key = resolve_asr_key(video.user)
+            if settings.asr_provider == "faster_whisper":
+                ensure_local_asr_available()
+                asr_key = None
+            else:
+                asr_key = resolve_asr_key(video.user)
             audio = extract_audio(video_path=downloaded.file_path, video_id=video.id)
             video.audio_path = audio.file_path
             db.add(video)

@@ -4,6 +4,7 @@ export type AiSettings = {
   has_api_key: boolean;
   has_asr_api_key: boolean;
   demo_mode: boolean;
+  asr_provider: string;
 };
 
 export type AiSettingsWrite = {

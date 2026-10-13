@@ -12,6 +12,10 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY requirements-local-ai.txt .
+ARG INSTALL_LOCAL_AI=false
+RUN if [ "$INSTALL_LOCAL_AI" = "true" ]; then pip install --no-cache-dir -r requirements-local-ai.txt; fi
+
 COPY . .
 
 CMD ["sh", "-c", "python -m scripts.migrate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

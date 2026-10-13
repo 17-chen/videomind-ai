@@ -1,0 +1,3 @@
+# Install in addition to requirements.txt when local ASR or Chinese embeddings are enabled.
+faster-whisper>=1.1,<3
+sentence-transformers>=3,<7

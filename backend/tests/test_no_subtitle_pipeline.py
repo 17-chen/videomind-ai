@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.errors import ApiError
+from app.core.config import settings
 from app.database.base import Base
 from app.models import AiSettings, Embedding, Summary, Transcript, User, Video  # noqa: F401
 from app.models.video import VideoStatus
 from app.services.video_processing import pipeline
+from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import DownloadedVideo, ExtractedAudio, TranscriptResult
 
 
@@ -72,3 +74,35 @@ def test_no_subtitle_transcribes_with_owners_asr_key(monkeypatch, video_db):
     assert events == ["key", "extract", "transcribe"]
     assert completed.status == VideoStatus.COMPLETED.value
     assert completed.transcript.content == "Transcribed words"
+
+
+def test_no_subtitle_uses_local_asr_without_key(monkeypatch, video_db):
+    db, video = video_db
+    _mock_download(monkeypatch)
+    monkeypatch.setattr(settings, "asr_provider", "faster_whisper")
+    monkeypatch.setattr(pipeline, "ensure_local_asr_available", lambda: None)
+    monkeypatch.setattr(pipeline, "resolve_asr_key", lambda user: pytest.fail("local ASR must not need a key"))
+    monkeypatch.setattr(pipeline, "extract_audio", lambda **kwargs: ExtractedAudio(video_id=video.id, file_path="/tmp/local-audio.mp3"))
+
+    def transcribe_audio(audio_path, video_id, api_key):
+        assert api_key is None
+        return TranscriptResult(video_id=video_id, content="本地转写", source="faster_whisper")
+
+    monkeypatch.setattr(pipeline, "transcribe_audio", transcribe_audio)
+    completed = pipeline.process_video(db, video)
+    assert completed.transcript.content == "本地转写"
+
+
+def test_missing_local_asr_component_fails_before_audio_extraction(monkeypatch, video_db):
+    db, video = video_db
+    _mock_download(monkeypatch)
+    monkeypatch.setattr(settings, "asr_provider", "faster_whisper")
+    monkeypatch.setattr(
+        pipeline, "ensure_local_asr_available",
+        lambda: (_ for _ in ()).throw(VideoProcessingError("本地组件未安装")),
+    )
+    monkeypatch.setattr(pipeline, "extract_audio", lambda **kwargs: pytest.fail("audio extraction must not start"))
+
+    with pytest.raises(VideoProcessingError, match="本地组件未安装"):
+        pipeline.process_video(db, video)
+    assert video.status == VideoStatus.FAILED.value

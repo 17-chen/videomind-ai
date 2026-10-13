@@ -3,8 +3,12 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from functools import lru_cache
+
+from fastapi import status
 
 from app.core.config import settings
+from app.core.errors import ApiError
 
 WORD_RE = re.compile(r"[A-Za-z0-9_]+")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
@@ -35,6 +39,9 @@ class LocalHashEmbeddingService:
             return vector
         return [value / norm for value in vector]
 
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed_text(text)
+
     def _tokenize(self, text: str) -> list[str]:
         normalized = text.lower().strip()
         words = WORD_RE.findall(normalized)
@@ -44,3 +51,33 @@ class LocalHashEmbeddingService:
 
 
 embedding_service = LocalHashEmbeddingService()
+
+
+@lru_cache(maxsize=2)
+def _load_sentence_model(model_name: str):
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise ApiError("中文向量组件未安装，请安装 backend/requirements-local-ai.txt", status.HTTP_503_SERVICE_UNAVAILABLE) from exc
+    return SentenceTransformer(model_name)
+
+
+class BgeZhEmbeddingService:
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def embed_text(self, text: str) -> list[float]:
+        values = _load_sentence_model(self.model_name).encode(text, normalize_embeddings=True)
+        return [float(value) for value in values]
+
+    def embed_query(self, text: str) -> list[float]:
+        instruction = "为这个句子生成表示以用于检索相关文章："
+        return self.embed_text(instruction + text)
+
+
+def current_embedding_service() -> LocalHashEmbeddingService | BgeZhEmbeddingService:
+    if settings.embedding_provider == "local_hash":
+        return embedding_service
+    if settings.embedding_provider == "bge_zh":
+        return BgeZhEmbeddingService(settings.embedding_model)
+    raise ApiError("不支持的向量模型配置", status.HTTP_503_SERVICE_UNAVAILABLE)

@@ -42,6 +42,7 @@ def public_settings(user: User) -> AiSettingsRead:
         has_api_key=bool(value and value.encrypted_api_key),
         has_asr_api_key=bool(value and value.encrypted_asr_api_key),
         demo_mode=not settings.uses_supabase_auth,
+        asr_provider=settings.asr_provider,
     )
 
 

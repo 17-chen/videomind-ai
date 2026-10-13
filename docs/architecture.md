@@ -13,7 +13,7 @@ FastAPI /api/v1
     ├─ 本地文件：视频、音频、Markdown 笔记
     ├─ yt-dlp + ffmpeg：下载和音频提取
     ├─ DeepSeek：视频分析与问答生成
-    └─ ChromaDB + local_hash embedding：当前 RAG 检索
+    └─ ChromaDB + local_hash（默认）或 bge_zh（可选）：当前 RAG 检索
 ```
 
 本地开发由 `docker-compose.yml` 默认编排 PostgreSQL、Adminer、后端和前端；Chroma 默认嵌入后端，可选独立服务。前端使用 Next.js 16.3.3、React 19、TypeScript、Tailwind；后端使用 Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。前端容器访问后端可用 `INTERNAL_API_BASE_URL`，浏览器使用 `NEXT_PUBLIC_API_BASE_URL`。
@@ -23,7 +23,7 @@ FastAPI /api/v1
 1. 前端提交 Bilibili/抖音 URL 或分享文本；后端创建归属于当前用户的 Video 记录。
 2. `POST /videos/{id}/process` 启动 BackgroundTask：yt-dlp 下载视频及字幕；有字幕时解析字幕，没有时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
 3. `POST /videos/{id}/analyze` 使用 LangGraph Video Analysis Agent 和 DeepSeek，生成结构化 Summary 与 Markdown 笔记。
-4. `POST /videos/{id}/embed` 拼接视频、转写和摘要文本，用 local_hash 生成向量并写入 Chroma，同时在 PostgreSQL 保存向量 ID。
+4. `POST /videos/{id}/embed` 拼接视频、转写和摘要文本，默认用 local_hash 生成向量；可选 bge_zh 对长文档分段。向量写入 Chroma，PostgreSQL 保存视频级向量 ID。
 5. `POST /chat` 按 user_id 检索 Chroma 结果，再调用 DeepSeek 生成中文回答并返回视频来源。
 
 视频详情现在也可调用 `POST /videos/{id}/run`，由单个 BackgroundTask 依次执行上述三步；重复启动通过数据库状态原子校验拒绝，失败后重试复用已保存的转写与笔记。这个任务不具备跨进程或重启后的恢复能力。状态枚举包括 created、queued、processing、downloading、transcribing、analyzing、embedding、completed、failed；“有状态字段”不等于每个阶段均经真实视频验证。
@@ -53,6 +53,7 @@ User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一�
 
 - `ASR_PROVIDER=disabled` 为默认值；Supabase 用户可在设置中提供自己的 OpenAI 转写密钥处理无字幕视频，真实外部调用尚未验收。`faster-whisper` 属计划，不是已接入能力。
 - `local_hash` 仅是确定性向量方案，用于流程验证；中文语义检索效果待更合适的模型验证。
+- 可选 `bge_zh` 使用单独集合和分段向量；切换模型后需要运行重新入库脚本，真实中文检索质量仍待评测。
 - BackgroundTasks 不提供跨重启持久化、可靠重试或队列隔离；长视频生产处理待改造。
 - 本地 `storage/` 不等于云端持久对象存储；Chroma 生产持久化/pgvector 迁移未完成。
 - 上传本地视频文件接口、笔记编辑、自动分类修改等初始需求尚未实现或未验收。

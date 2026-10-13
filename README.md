@@ -26,7 +26,7 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 - **Phase 5：RAG 问答基础实现**
 - **Phase 6：前端 UI 基础实现**
 - **Phase 7：本地生产化基础已实现，真实视频闭环待验收**
-- **Sprint 02：Supabase 用户系统接入中，代码尚未提交及运行验收**
+- **Sprint 02：Supabase 用户系统代码已提交，真实项目运行验收待做**
 
 已完成内容：
 
@@ -34,7 +34,7 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 - 前端使用 Next.js 16.3.3、React 19、TypeScript 和 Tailwind CSS。
 - 后端规划为 Python FastAPI、SQLAlchemy、PostgreSQL。
 - 使用 Docker Compose 管理 PostgreSQL、Adminer 和应用服务；本地 Chroma 默认嵌入后端，独立服务按需启用。
-- 实现 URL 视频下载、字幕优先解析和音频提取；ASR 默认为关闭，暂无可用的本地转写 fallback。
+- 实现 URL 视频下载、字幕优先解析和音频提取；ASR 默认为关闭，可选安装本地 faster-whisper。
 - 实现 DeepSeek 视频分析 Agent、Markdown 笔记生成、ChromaDB 写入和 Chat With My Videos API。
 - 实现中文优先的 Next.js 前端：工作台、知识库、视频详情、视频问答和快速添加入口。
 - 提供 `.env.example` 作为环境变量模板。
@@ -44,7 +44,7 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 
 视频详情可一键处理字幕、生成 AI 笔记并写入知识库，也可分别执行各阶段；失败后的一键重试复用已完成阶段。此流程目前由本地 BackgroundTasks 执行，真实视频与服务商调用尚未验收。
 
-后续阶段会继续做 UI 视觉精修、文件上传、本地 ASR 和更强的中文向量模型。
+本地 ASR 和中文向量模型现已有可选接入，后者支持长文档分段；安装与切换步骤见 [本地 AI 配置](docs/LOCAL_AI.md)。真实模型与检索质量仍待验收。后续阶段会继续做 UI 视觉精修和文件上传。
 
 ## 项目结构
 
@@ -109,8 +109,8 @@ videomind-ai/
 ### AI / Data
 
 - DeepSeek API
-- 可插拔 ASR，当前默认关闭；后续推荐接本地 faster-whisper
-- 本地 hash embedding，后续可替换为 bge-m3 / sentence-transformers
+- 可插拔 ASR，默认关闭；可选本地 faster-whisper
+- 默认本地 hash embedding；可选中文 BGE 向量模型
 - ChromaDB
 - 后续可扩展 Gemini、Claude、Pinecone
 
@@ -339,7 +339,7 @@ DEEPSEEK_API_KEY=你的 DeepSeek API Key
 ```text
 LLM_PROVIDER=deepseek
 LLM_BASE_URL=https://api.deepseek.com
-LLM_MODEL=deepseek-v4-flash
+LLM_MODEL=deepseek-flash
 EMBEDDING_PROVIDER=local_hash
 ```
 

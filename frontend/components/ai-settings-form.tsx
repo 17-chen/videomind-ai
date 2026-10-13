@@ -11,7 +11,7 @@ export function AiSettingsForm() {
   const tx = useTranslator();
   const [current, setCurrent] = useState<AiSettings | null>(null);
   const [provider, setProvider] = useState<"deepseek" | "openai">("deepseek");
-  const [model, setModel] = useState("deepseek-v4-flash");
+  const [model, setModel] = useState("deepseek-flash");
   const [apiKey, setApiKey] = useState("");
   const [asrKey, setAsrKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,7 @@ export function AiSettingsForm() {
 
   function changeProvider(value: "deepseek" | "openai") {
     setProvider(value);
-    if (!current || current.provider !== value) setModel(value === "deepseek" ? "deepseek-v4-flash" : "gpt-4.1-mini");
+    if (!current || current.provider !== value) setModel(value === "deepseek" ? "deepseek-flash" : "gpt-4.1-mini");
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -50,7 +50,7 @@ export function AiSettingsForm() {
     setBusy(true); setError(""); setMessage("");
     try {
       await deleteAiSettings();
-      setCurrent({ provider: null, model: null, has_api_key: false, has_asr_api_key: false, demo_mode: current?.demo_mode ?? false });
+      setCurrent({ provider: null, model: null, has_api_key: false, has_asr_api_key: false, demo_mode: current?.demo_mode ?? false, asr_provider: current?.asr_provider ?? "disabled" });
       setApiKey(""); setAsrKey(""); setMessage(tx("密钥已删除"));
     } catch (err) { setError(err instanceof Error ? err.message : tx("删除失败")); }
     finally { setBusy(false); }
@@ -66,11 +66,13 @@ export function AiSettingsForm() {
     {!current && !error ? <p className="text-sm text-muted-foreground">{tx("加载设置中")}</p> : null}
     <form onSubmit={save} className="space-y-5">
       <label className="block text-sm font-semibold">{tx("服务商")}<select value={provider} onChange={(e) => changeProvider(e.target.value as "deepseek" | "openai")} className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4"><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option></select></label>
-      <label className="block text-sm font-semibold">{tx("模型名称")}<Input required value={model} onChange={(e) => setModel(e.target.value)} className="mt-2" placeholder="deepseek-v4-flash" /></label>
+      <label className="block text-sm font-semibold">{tx("模型名称")}<Input required value={model} onChange={(e) => setModel(e.target.value)} className="mt-2" placeholder="deepseek-flash" /></label>
       <label className="block text-sm font-semibold">{tx("模型 API Key")}<Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="mt-2" placeholder={tx("填写新密钥以替换，留空则不修改")} /></label>
       <p className="text-xs leading-5 text-muted-foreground">{tx("首次保存必须填写密钥。以后留空表示保持原密钥。")}</p>
-      <label className="block text-sm font-semibold">{tx("OpenAI 转写 API Key（可选）")}<Input type="password" autoComplete="off" value={asrKey} onChange={(e) => setAsrKey(e.target.value)} className="mt-2" placeholder={tx("单独设置转写密钥，留空则不修改")} /></label>
-      <p className="text-xs leading-5 text-muted-foreground">{tx("当视频没有字幕时，转写需要 OpenAI API Key。若模型服务商是 OpenAI，可直接使用上方的模型密钥。")}</p>
+      {current?.asr_provider === "faster_whisper" ? <p className="rounded-xl bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">{tx("本地转写已启用。无字幕视频会使用服务器上的模型，不需要 OpenAI 转写密钥。")}</p> : <>
+        <label className="block text-sm font-semibold">{tx("OpenAI 转写 API Key（可选）")}<Input type="password" autoComplete="off" value={asrKey} onChange={(e) => setAsrKey(e.target.value)} className="mt-2" placeholder={tx("单独设置转写密钥，留空则不修改")} /></label>
+        <p className="text-xs leading-5 text-muted-foreground">{tx("当视频没有字幕时，转写需要 OpenAI API Key。若模型服务商是 OpenAI，可直接使用上方的模型密钥。")}</p>
+      </>}
       {error ? <p role="alert" className="text-sm text-destructive">{tx(error)}</p> : null}
       {message ? <p role="status" className="flex items-center gap-2 text-sm text-emerald-700"><ShieldCheck size={16} />{message}</p> : null}
       <div className="flex flex-wrap gap-3"><Button type="submit" disabled={busy || !current || current.demo_mode}>{busy ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />}{tx("保存设置")}</Button>{current?.has_api_key ? <SecondaryButton type="button" disabled={busy} onClick={remove}><Trash2 size={16} />{tx("删除密钥")}</SecondaryButton> : null}</div>

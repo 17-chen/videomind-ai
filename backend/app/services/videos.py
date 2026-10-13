@@ -73,6 +73,20 @@ def update_video_status(
     return video
 
 
+def recover_interrupted_videos(db: Session) -> int:
+    """Release tasks abandoned by a stopped single-process local server."""
+    result = db.execute(
+        update(Video)
+        .where(Video.status.in_(ACTIVE_VIDEO_STATUSES))
+        .values(
+            status=VideoStatus.FAILED.value,
+            processing_error="服务重启中断了处理，请点击重试",
+        )
+    )
+    db.commit()
+    return result.rowcount or 0
+
+
 def list_videos_for_user(
     db: Session,
     user: User,

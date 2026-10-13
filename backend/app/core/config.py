@@ -36,17 +36,22 @@ class Settings(BaseSettings):
     llm_provider: str = "deepseek"
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
-    llm_model: str = "deepseek-v4-flash"
+    llm_model: str = "deepseek-flash"
 
     deepseek_api_key: str = ""
     user_api_key_encryption_key: str = ""
 
     embedding_provider: str = "local_hash"
     embedding_dimensions: int = 384
+    embedding_model: str = "BAAI/bge-small-zh-v1.5"
 
     asr_provider: str = "disabled"
     openai_api_key: str = ""
     openai_whisper_model: str = "whisper-1"
+    local_whisper_model: str = "base"
+    local_whisper_device: str = "cpu"
+    local_whisper_compute_type: str = "int8"
+    recover_interrupted_tasks_on_startup: bool = True
 
     video_storage_dir: str = "/app/storage/videos"
     audio_storage_dir: str = "/app/storage/audio"

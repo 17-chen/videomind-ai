@@ -9,7 +9,8 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, logger
-from app.database.session import create_database_tables
+from app.database.session import SessionLocal, create_database_tables
+from app.services.videos import recover_interrupted_videos
 
 
 @asynccontextmanager
@@ -22,6 +23,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         create_database_tables()
     else:
         logger.info("Skipping automatic table creation; database schema is managed by Alembic")
+    if not settings.is_production and settings.recover_interrupted_tasks_on_startup:
+        with SessionLocal() as db:
+            recovered = recover_interrupted_videos(db)
+        if recovered:
+            logger.warning("Marked {} interrupted local video tasks retryable", recovered)
     yield
     logger.info("Stopping {}", settings.app_name)
 

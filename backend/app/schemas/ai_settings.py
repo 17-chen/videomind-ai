@@ -16,3 +16,4 @@ class AiSettingsRead(BaseModel):
     has_api_key: bool = False
     has_asr_api_key: bool = False
     demo_mode: bool = False
+    asr_provider: str = "disabled"

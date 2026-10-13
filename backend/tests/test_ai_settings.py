@@ -64,6 +64,15 @@ def test_settings_reject_missing_first_key_and_untrusted_provider(api):
     assert client.put("/api/v1/settings/ai", headers=headers("alice"), json={"provider": "local", "model": "x", "api_key": "abcdefgh"}).status_code == 422
 
 
+def test_settings_expose_asr_mode_without_exposing_keys(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "asr_provider", "faster_whisper")
+    response = client.get("/api/v1/settings/ai", headers=headers("alice"))
+    assert response.status_code == 200
+    assert response.json()["asr_provider"] == "faster_whisper"
+    assert "api_key" not in response.json()
+
+
 def test_analysis_and_chat_use_the_authenticated_users_model(api, monkeypatch):
     from types import SimpleNamespace
     from app.agents.video_analysis_agent import analyze_video_transcript
