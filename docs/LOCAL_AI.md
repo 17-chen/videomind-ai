@@ -31,8 +31,11 @@ docker compose --profile app up -d --build backend
 `bge_zh` 使用 `BAAI/bge-small-zh-v1.5`，查询会加入中文检索指令。长文档按约 350 字分段并保留重叠，搜索结果按视频去重。它与旧 `local_hash` 使用不同的 Chroma 集合，避免维度和向量意义混用。切换后，用下面的命令把数据库中已有的转写与笔记重新写入当前集合：
 
 ```bash
+docker compose exec backend python -m scripts.reindex_vectors --dry-run
 docker compose exec backend python -m scripts.reindex_vectors
 ```
+
+第一条只统计可重新入库的视频，不写入向量；确认数量后运行第二条。多用户部署时可加 `--user-id <用户ID>` 限定范围，用 `--limit <数量>` 先对前几条视频试运行；重复使用同一限制仍会从第一条开始。脚本按 ID 顺序逐批读取视频，跳过无转写且无摘要的视频；单条失败会回滚数据库事务、继续处理其余视频，最后列出失败视频 ID 并返回非零退出码。修复原因后重复运行即可，重新入库会更新同一视频的向量。
 
 已有视频的旧向量集合不会自动清空；删除视频时会清理本项目的旧 hash 集合及所有 `bge_zh` 集合。重新入库运行期间，知识库搜索可能暂时缺少部分旧视频。改变 `EMBEDDING_MODEL` 后也需要重新入库。
 
