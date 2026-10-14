@@ -5,7 +5,9 @@ from app.core.config import settings
 from app.services.video_processing.types import SubtitleResult
 
 
-TIMESTAMP_PATTERN = re.compile(r"^\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}")
+TIMESTAMP_PATTERN = re.compile(
+    r"^(?:\d{2}:)?\d{2}:\d{2}[,.]\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}[,.]\d{3}"
+)
 WEBVTT_PATTERN = re.compile(r"^WEBVTT|^Kind:|^Language:", re.IGNORECASE)
 TAG_PATTERN = re.compile(r"<[^>]+>")
 
