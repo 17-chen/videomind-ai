@@ -53,8 +53,14 @@ http://localhost:8000/docs
 
 - `limit`：每页数量，默认 `20`
 - `offset`：偏移量，默认 `0`
-- `search`：可选搜索关键词
-- `category`：可选分类过滤
+- `search`：可选搜索关键词，最长 120 字符，匹配原始标题、描述、链接以及 AI 标题和摘要；`%`、`_` 按普通文字匹配。
+- `category`：可选分类过滤，最长 120 字符。
+
+响应的 `total` 为筛选后的视频总数；排序为创建时间倒序、ID 倒序。前端 `/library` 使用从 1 开始的 `page` 参数转换为 offset，每页 20 条。
+
+### `GET /api/v1/videos/categories`
+
+返回当前用户整个视频库中的非空分类字符串数组，去重并排序，不受列表分页或搜索条件影响。Supabase 模式下需要有效用户令牌。
 
 ### `GET /api/v1/videos/{id}`
 

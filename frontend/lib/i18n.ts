@@ -1,6 +1,15 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "视频库分页": ["视频库分页", "Library pagination"],
+  "上一页": ["上一页", "Previous"],
+  "下一页": ["下一页", "Next"],
+  "搜索视频": ["搜索视频", "Search videos"],
+  "搜索标题、描述或 AI 摘要": ["搜索标题、描述或 AI 摘要", "Search titles, descriptions or AI summaries"],
+  "匹配的视频": ["匹配的视频", "Matching videos"],
+  "清除筛选": ["清除筛选", "Clear filters"],
+  "没有匹配的视频": ["没有匹配的视频", "No matching videos"],
+  "试试其他关键词或清除筛选，已有视频仍保留在知识库中。": ["试试其他关键词或清除筛选，已有视频仍保留在知识库中。", "Try other keywords or clear the filters. Your saved videos are still in your library."],
   "首页": ["首页", "Home"], "工作台": ["工作台", "Dashboard"], "知识库": ["知识库", "Library"], "视频问答": ["视频问答", "Video Q&A"], "设置": ["设置", "Settings"], "登录": ["登录", "Sign in"], "退出": ["退出", "Sign out"],
   "AI Video Memory": ["AI 视频记忆", "AI Video Memory"], "Video Library": ["视频库", "Video Library"], "AI Notes": ["AI 笔记", "AI Notes"], "Knowledge Map": ["知识图谱", "Knowledge Map"], "Memory Space": ["记忆空间", "Memory Space"], "Transcript": ["转写", "Transcript"], "Notes": ["笔记", "Notes"], "Timeline": ["时间线", "Timeline"],
   "Today": ["今天", "Today"], "Good afternoon": ["欢迎回来", "Welcome back"], "Your AI memory today": ["今天的 AI 记忆", "Your AI memory today"], "Recent Learning": ["近期内容", "Recent learning"], "Add memory": ["添加记忆", "Add memory"], "Memory Archive": ["记忆归档", "Memory archive"], "Total memories": ["记忆总数", "Total memories"], "Ask Memory": ["询问记忆", "Ask memory"], "Memory answer": ["记忆回答", "Memory answer"], "Knowledge Card": ["知识卡片", "Knowledge card"], "Markdown Notes": ["Markdown 笔记", "Markdown notes"], "AI Actions": ["AI 操作", "AI actions"], "Ask this memory": ["询问这条记忆", "Ask this memory"], "打开 AI Chat": ["打开 AI 问答", "Open AI chat"], "原视频": ["原视频", "Original video"], "Untitled Memory": ["未命名记忆", "Untitled memory"],

@@ -53,13 +53,18 @@ function formatApiError(payload: unknown): string {
   return [...new Set(messages)].join("；") || "请求参数不正确，请检查后重试。";
 }
 
-export async function listVideos(params?: { search?: string; category?: string; limit?: number }, accessToken?: string) {
+export async function listVideos(params?: { search?: string; category?: string; limit?: number; offset?: number }, accessToken?: string) {
   const query = new URLSearchParams();
   if (params?.search) query.set("search", params.search);
   if (params?.category) query.set("category", params.category);
   if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return request<VideoListResponse>(`/videos${suffix}`, undefined, accessToken);
+}
+
+export async function listVideoCategories(accessToken?: string) {
+  return request<string[]>("/videos/categories", undefined, accessToken);
 }
 
 export async function getVideo(id: string, accessToken?: string) {

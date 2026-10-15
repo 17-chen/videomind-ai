@@ -17,6 +17,7 @@ from app.services.videos import (
     create_video,
     delete_video_for_user,
     get_video_for_user,
+    list_video_categories_for_user,
     list_videos_for_user,
     mark_video_processing,
     update_video_status,
@@ -53,7 +54,7 @@ def list_videos(
     limit: int = Query(default=20, ge=1, le=100, title="每页数量"),
     offset: int = Query(default=0, ge=0, title="分页偏移量"),
     search: str | None = Query(default=None, min_length=1, max_length=120, title="搜索关键词"),
-    category: str | None = Query(default=None, min_length=1, max_length=80, title="分类"),
+    category: str | None = Query(default=None, min_length=1, max_length=120, title="分类"),
 ) -> VideoListResponse:
     videos, total = list_videos_for_user(
         db=db,
@@ -69,6 +70,14 @@ def list_videos(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/categories", response_model=list[str], summary="获取我的视频分类")
+def list_video_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[str]:
+    return list_video_categories_for_user(db=db, user=current_user)
 
 
 @router.get(

@@ -98,8 +98,15 @@ def list_videos_for_user(
     statement = _base_video_query(user.id)
 
     if search:
-        pattern = f"%{search}%"
-        statement = statement.where(or_(Video.title.ilike(pattern), Video.description.ilike(pattern), Video.url.ilike(pattern)))
+        statement = statement.where(or_(
+            Video.title.icontains(search, autoescape=True),
+            Video.description.icontains(search, autoescape=True),
+            Video.url.icontains(search, autoescape=True),
+            Video.summary.has(or_(
+                Summary.title.icontains(search, autoescape=True),
+                Summary.summary.icontains(search, autoescape=True),
+            )),
+        ))
 
     if category:
         statement = statement.join(Summary, Summary.video_id == Video.id).where(Summary.category == category)
@@ -109,13 +116,23 @@ def list_videos_for_user(
 
     videos = list(
         db.scalars(
-            statement.order_by(Video.created_at.desc())
+            statement.order_by(Video.created_at.desc(), Video.id.desc())
             .offset(offset)
             .limit(limit)
             .options(joinedload(Video.transcript), joinedload(Video.summary))
         ).unique()
     )
     return videos, total
+
+
+def list_video_categories_for_user(db: Session, user: User) -> list[str]:
+    return list(db.scalars(
+        select(Summary.category)
+        .join(Video, Summary.video_id == Video.id)
+        .where(Video.user_id == user.id, Summary.category.is_not(None), Summary.category != "")
+        .distinct()
+        .order_by(Summary.category)
+    ))
 
 
 def get_video_for_user(db: Session, user: User, video_id: str) -> Video:
