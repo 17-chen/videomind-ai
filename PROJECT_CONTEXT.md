@@ -15,6 +15,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 **Git 快照：**2026-10-16 开工时 `main` 与 GitHub 一致，最近提交为 `6fce45f`；此前本地 AI、向量重建工具和知识库分页均已提交。本轮增加中文检索评测，具体变更和验证见 CHANGELOG。
 
+**交接补充：**检索评测已随 `064b1b7` 推送；随后将 `PROJECT_HANDOFF.md` 重整为完整当前快照，`docs/COMPLETION_PLAN.md` 补充 R1–R9 的验收与依赖。新聊天先从仓库 `AGENTS.md` 和 [恢复说明](docs/NEW_CHAT_START.md) 进入，不依赖旧聊天自动继承。
+
 ## 技术架构
 
 - 前端：Next.js 16.3.3、React 19、TypeScript、Tailwind CSS。

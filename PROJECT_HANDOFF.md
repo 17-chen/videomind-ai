@@ -1,102 +1,186 @@
-# VideoMind AI 项目交接
+# VideoMind AI 完整交接文档
 
-> 更新：2026-10-16。供一段时间未开发后恢复工作；以本地代码和当时的实测结果为准。
+> 更新：2026-10-16。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
 
-## 项目介绍
+## 1. 先读摘要
 
-把 Bilibili、抖音等收藏视频转成转写文本、AI 笔记、个人知识库和可引用来源的视频问答。当前产品主要是本地 Demo，计划逐步上线作品集版本。
+项目把收藏的视频转为转写文本、结构化 AI 笔记、可搜索的个人知识库和可追溯来源的问答。基础产品已能在本地演示；正式多用户所需的真实认证验收、可靠队列、云端存储和上线收尾仍未完成。
 
-## 当前目标与阶段
+- **真实仓库：**`/Users/chenxin/Documents/Codex 2/videomind-ai`。
+- **GitHub：**`https://github.com/17-chen/videomind-ai`；remote 为 `git@github.com:17-chen/videomind-ai.git`，主分支 `main`。
+- **最近功能基线：**`064b1b7afe5038724c3e4e7c463935eb6caa7614`（中文检索评测与完成计划），已推送。本次交接整理会产生后续文档提交，恢复时以实际 Git 为准。
+- **本次文档整理前：**工作树干净，`main` 与已知 `origin/main` 一致；不要把旧文档中的“未提交工作树”当作当前事实。
+- **最新后端证据：**2026-10-16，62 项测试与 Ruff 通过。
+- **最新前端证据：**2026-10-15，typecheck、lint、生产构建和 43 条临时样例的页面检查通过；10 月 16 日没有修改前端。
+- **下一步：**按剩余计划 R1 验证真实本地模型与检索对照；若网络或账号阻塞，继续 R3/R4 等可独立任务。
+- **没有遗留的半成品实现：**本轮检索工具已提交并有报告；真实模型效果未验收是后续工作，不是工具测试失败。
 
-- Phase 1–6 的基础实现已有代码：项目骨架、视频 API、字幕优先处理、AI 分析、RAG 基础和中文前端。
-- Phase 7 的 Alembic、生产构建和健康检查基础此前已验证；真实视频全流程仍待验收。
-- 当前 Sprint 02：Supabase 认证与用户隔离。2026-10-08 已补 Auth 服务校验、邮箱冲突保护、页面会话刷新与退出入口；认证代码已随 `8f8047d` 提交，仍没有接入真实 Supabase 项目。
-- 代码仓库：`/Users/chenxin/Documents/Codex 2/videomind-ai`；Git remote 为 `git@github.com:17-chen/videomind-ai.git`。
+先读本文件，再读 [剩余工作](docs/COMPLETION_PLAN.md)、[项目上下文](PROJECT_CONTEXT.md)、[TODO](TODO.md)。详细索引见 [项目资料](docs/PROJECT_MATERIALS.md)；新聊天开场文字见 [恢复说明](docs/NEW_CHAT_START.md)。
 
-## 2026-10-15 开工快照
+## 2. 用户目标和协作偏好
 
-- 当前分支 `main`；开工时最近提交为 `d3637fd`，工作树干净且与 GitHub 一致。此前本地 AI、分段索引和向量重建工具已提交，不再是未提交工作。
-- 本轮补齐知识库分页、筛选保留、AI 摘要搜索和全库分类入口；后端 52 项测试、Ruff、前端 typecheck/lint/build 与 43 条虚构数据的生产页面检查通过。
-- `.env` 在本地且不提交；真实 Supabase 和服务商验收仍未完成。先检查实际 Git 状态再继续修改，不要按历史工作树描述执行清理。
+1. 网站中英文切换，中文为默认界面；已实现，不要重做。
+2. 登录用户使用自己的模型、API Key 和服务商账户计费；禁止回退到站长的密钥。
+3. 开发应先核对现有功能、修复问题，再推进明确的后续项；完成后报告实际检查结果。
+4. 用户多次要求开发成果同步 GitHub，并希望能本地预览。发布行为以当前聊天明确授权为准；历史偏好不能替代新会话授权。
+5. 用中文、尽量不用不必要的技术术语；常规可逆开发自主完成，遇到真实缺失信息再说明。
+6. 用户要求长期保留项目记忆；每轮重要工作更新文档，不依赖聊天自动继承。
+7. 2026-10-16 的工程估算：本地功能收束 16–26 小时，完整小规模多用户版本累计 50–80 小时；不计等待用户注册/授权账号，包含配置后的联调修复。详见剩余计划，不是保证日期。
 
-## 重要入口
+## 3. 架构和代码入口
 
-- 前端页面：`frontend/app/`；API 客户端：`frontend/lib/api.ts`；认证：`frontend/lib/supabase/` 和 `frontend/components/auth-form.tsx`。
-- 后端入口：`backend/app/main.py`；接口：`backend/app/api/v1/routes/`；视频处理：`backend/app/services/video_processing/`。
-- AI 分析：`backend/app/agents/video_analysis_agent.py`；RAG：`backend/app/services/rag.py`、`vector_store.py`、`embeddings.py`。
-- 数据模型和迁移：`backend/app/models/`、`backend/alembic/`；认证：`backend/app/services/auth.py`、`backend/app/api/dependencies.py`。
-- 配置模板：`.env.example`；本地编排：`docker-compose.yml`。
-- 文档入口：[项目资料](docs/PROJECT_MATERIALS.md)、[当前架构](docs/architecture.md)、[阶段路线图](docs/roadmap.md)。
+保留现有 monorepo，不要为恢复上下文而更换框架。
 
-## 已确认的技术决策
+| 模块 | 当前实现 | 入口 |
+| --- | --- | --- |
+| 前端 | Next.js 16.3.3、React 19、TypeScript、Tailwind | `frontend/app/`、`frontend/components/` |
+| 中英文 | Cookie 记录语言，前后端提示逐步双语化 | `frontend/lib/{i18n,language,server-language}.*` |
+| 前端接口 | 浏览器与服务端分别选择 API 地址，传递用户令牌 | `frontend/lib/api.ts` |
+| 认证 | 默认 demo；可选 Supabase Auth 校验与用户映射 | `frontend/lib/supabase/`、`backend/app/{api/dependencies,services/auth}.py` |
+| API | FastAPI /api/v1，SQLAlchemy 数据访问 | `backend/app/api/v1/routes/`、`backend/app/main.py` |
+| 视频处理 | yt-dlp、字幕优先、ffmpeg 提取音频、可选 ASR | `backend/app/services/video_processing/` |
+| 一键流程 | 转写 → 分析 → 向量写入，失败复用已有阶段 | `backend/app/services/video_workflow.py` |
+| 分析 | LangGraph 生成结构化摘要和 Markdown | `backend/app/agents/video_analysis_agent.py`、`backend/app/services/analysis.py` |
+| 个人 Key | 按用户保存，加密存储，不回传明文 | `backend/app/services/ai_settings.py`、`backend/app/models/ai_settings.py` |
+| RAG | hash 默认、BGE 可选，Chroma 检索后生成回答 | `backend/app/services/{rag,embeddings,vector_store}.py` |
+| 数据 | PostgreSQL 保存用户、视频、转写、摘要、向量映射和设置 | `backend/app/models/`、`backend/alembic/` |
+| 本地文件 | 媒体、音频、转写、笔记和模型缓存 | `storage/`，不随 Git 提交 |
+| 运维脚本 | 迁移、向量重建、固定检索评测 | `backend/scripts/` |
 
-- 本地优先；作品集上线计划为 Vercel + Render + Supabase，向量层拟由 Chroma 转向 pgvector。
-- DeepSeek 用于分析与回答；当前本地 hash embedding 仅验证检索流程，不代表高质量中文语义检索。
-- 在扩展 Library 前优先建立真实认证和用户隔离，同时保留本地 demo 模式。
-- 长视频后台工作当前依赖 FastAPI BackgroundTasks，生产环境需要可靠队列。
+已接受的方向：本地优先，后续 Vercel + Render + Supabase；向量生产适配拟采用 pgvector。Redis/Celery 是队列候选，不是现有实现。长期决定见 [DECISION_LOG](DECISION_LOG.md)。
 
-详见 [DECISION_LOG](DECISION_LOG.md)。
+## 4. 已有功能与验收边界
 
-## 验证状态与风险
+| 能力 | 代码状态 | 已有证据 / 仍缺什么 |
+| --- | --- | --- |
+| URL 和分享文本添加视频 | 已实现 | 本地 API 创建/读取/删除烟测通过；真实平台下载仍受网络和平台影响 |
+| 详情、阶段状态和一键流程 | 已实现 | 模拟 API 全链路、失败续跑和并发请求保护通过；真实视频完整链路未验收 |
+| 字幕与转写 | 已实现字幕优先，可选 faster-whisper/OpenAI | 模拟本地模型和无字幕缺 Key 路径通过；真实本地音频未验收 |
+| AI 笔记 | 已实现摘要、观点、行动项和 Markdown | 模拟调用通过，前端支持复制/下载；笔记编辑未做 |
+| 中英文和个人模型设置 | 已实现 | 设置读写状态与加密、demo 禁止写 Key、本人配置调用路径已有测试；真实服务商计费待验收 |
+| Supabase 注册/登录/退出/刷新 | 代码已实现 | 模拟身份、令牌验证、邮箱冲突与路由保护通过；真实双用户浏览器验收未做 |
+| 知识库分页、搜索、分类 | 已实现 | 每页 20 条，筛选保留、AI 标题/摘要搜索、全库分类；52 项后端测试阶段和生产页面样例通过 |
+| 持久化 Chroma 与删除 | 已实现本地单实例 | 持久化重开、用户过滤、跨集合清理和故障保留有测试 |
+| BGE 长文本索引 | 已接入可选实现 | 分段、去重、安全更新和扩大候选已有测试；真实模型未下载/验收 |
+| 固定检索评测 | 已完成 | 真实 hash + 内存 Chroma，15 个虚构问题，召回与逐题报告见下节 |
+| 上传、资料编辑、可靠队列、任务取消 | 未完成 | 详见 R3–R5，不能因为已有状态枚举就当作已实现 |
+| 云存储/pgvector、配额监控、正式部署 | 未完成 | 详见 R6、R8、R9 |
 
-- 2026-10-08：起初前端超时，原因是旧容器内 `/app` bind mount 为空；使用 Colima socket 重新创建前后端容器后，首页、认证页、Dashboard、Library、Chat 与后端 readiness 均返回 200。
-- 前端在隔离副本中通过 typecheck、lint、生产构建；后端在实际 Python 3.12 容器中通过 16 项测试，当时 Alembic 版本为 `20260904_0002`；此后已迁移至 `20261008_0004`。
-- 使用临时测试配置验证未登录访问 Dashboard、Library、Chat 均重定向至 `/auth`。工作台和知识库在后端不可用时显示错误面板。预览首页示意数据已标明，视频详情会刷新处理状态。真实 Supabase 注册、令牌刷新和双用户登录尚未运行验收。
-- 真实 Supabase 注册、登录、退出、JWT 与用户数据隔离尚未完成运行验收。
-- 完整视频 URL → 转写 → 分析 → 向量写入 → 问答尚未以真实样例完成验收；无字幕视频因默认 ASR 关闭而不能自动转写。
-- 普通 shell 默认 Docker context 指向 Docker Desktop；本机项目容器使用 Colima socket。不要把默认 context 的连接失败误判为 Docker 容器停机。
+## 5. 关键实现约束
 
-## 下一步开发顺序
+- **密钥归属：**Supabase 模式按当前用户读取模型配置。demo 访问共用演示用户，因此禁止保存个人 Key，不能直接开放成多用户站点。
+- **认证映射：**只按 Supabase subject 映射本地用户；已有邮箱冲突拒绝自动合并，避免接管 demo 或其他账号资料。
+- **加密主密钥：**`USER_API_KEY_ENCRYPTION_KEY` 保存在未提交环境中。不能为排错随意覆盖或重新生成，否则已有加密 Key 无法读取。
+- **用户隔离：**视频查询、分类、处理和删除按 user_id；向量检索也有 user_id 过滤。未来上传、任务和存储接口必须继承同一边界。
+- **任务：**当前为 FastAPI BackgroundTasks，通过数据库状态原子更新防重复启动。重启只会在本地把中断任务标为失败供手动重试，不会自动持久化恢复。
+- **安全索引：**BGE 新分段使用内容版本 ID，先写入新版本，再清理旧版本；新写入失败时旧内容可继续检索。清理失败可能短时留两版，由检索按视频去重。
+- **删除顺序：**先删本人向量，再提交数据库删除，再清理本地文件。跨存储不具有原子事务；失败边界见技术决策日志。
+- **模型切换：**hash 与 BGE 使用不同集合；切换模型后要显式重建。重建先 dry-run，实际重建会写向量。
+- **资料修改：**未来编辑笔记/转写后必须考虑旧摘要和旧索引的一致性，不能只保存界面字段。
 
-1. 核对 Git 状态、Colima 开发容器和最近的验证记录；当前已无上轮待保护的未提交改动。
-2. 配置测试用 Supabase 项目，验收注册、登录、退出、过期令牌、用户 A/B 数据隔离和迁移；再提交 Sprint 02 代码。
-3. 选一个有字幕的真实视频完成 URL 到问答闭环，记录每一阶段结果与失败原因。
-4. 可选无字幕 ASR 和中文 embedding 已实现，继续真实效果验收，再推进文件上传、生产任务队列与持久化存储。
-5. 上线前复核 API 文档、部署审计和当前版本，避免沿用早期计划的旧结论。
+## 6. 检索评测和已有质量证据
 
-## 安全的恢复命令
+固定语料：`backend/evals/retrieval_zh.json`；原始报告：`backend/evals/baseline_local_hash.json`。
+
+- 12 条虚构视频文本、15 道问题，14 道计入检索质量，1 道空知识库只查隔离。
+- hash 维度 384，top-k=3；Hit rate=100%，Recall=96.43%，Precision=38.10%，MRR=1.00，跨用户违规为 0。
+- `paraphrase-resume` 漏掉一个标准视频，原始失败保留。
+- 语料很小、由项目编写且不是真实视频标签；这些分数不能证明真实中文问答达标。
+- 评测使用独立内存 Chroma，不读取 PostgreSQL 或项目持久向量。默认 `passed=true` 仅表示隔离检查通过；设置 `--min-recall` 后才增加召回门槛。
+- 当前工具测检索，不测生成回答。真实 BGE、ASR、最终回答准确性仍须完成 R1/R2。
+
+完整定义和命令见 [评测文档](docs/RETRIEVAL_EVALUATION.md)。
+
+## 7. 本机环境与恢复步骤
+
+以下是最后运行记录，开始新聊天仍应实际核对；Git 不包含这些服务或数据。
+
+- 前端本地预览：`http://localhost:3000`，知识库 `/library`，模型设置 `/settings`。
+- 本机 VideoMind API 使用 `http://localhost:8001`，容器内部后端仍为 8000；此前宿主 8000 被另一项目占用。
+- Docker 实际使用 Colima socket：`unix:///Users/chenxin/.colima/default/docker.sock`。默认 Docker Desktop socket 不存在不代表项目停机。
+- 后端/前端/PostgreSQL 容器分别为 `videomind-backend`、`videomind-frontend`、`videomind-postgres`。
+- 历史实测 Alembic 版本为 `20261008_0004 (head)`；新环境要核对实际版本并迁移，不盲目 stamp。
+- 之前为 demo 认证、embedded Chroma、local_hash、ASR disabled。实际值只在授权环境检查，不把 `.env` 整份输出。
+- `storage/model-cache/` 映射模型缓存；可选依赖默认不安装，首次下载不等于已缓存成功。
+
+### 只读恢复命令
 
 ```bash
 cd '/Users/chenxin/Documents/Codex 2/videomind-ai'
 git status --short --branch
+git log -6 --oneline
 git diff --check
-git log -5 --oneline
+export DOCKER_HOST=unix:///Users/chenxin/.colima/default/docker.sock
+docker compose ps
 curl --max-time 5 http://localhost:8001/api/v1/health/ready
-DOCKER_HOST=unix:///Users/chenxin/.colima/default/docker.sock docker compose ps
 ```
 
-如果 Docker 未运行，先恢复运行环境；不要直接把“容器不存在”当作业务代码回归。不要把 `.env` 输出到聊天、日志或提交中。
+readiness 应包含 `service=VideoMind AI`；必要时检查 `/openapi.json` 有视频路由，避免测试到另一应用。服务停机时先查日志和挂载，不删除数据库或数据卷。
 
-## 2026-10-08 新增能力
+### 后端验证
 
-- `/settings` 提供中文模型设置及中英文切换；Next.js 自带的英文 Preferences 已从开发预览隐藏。
-- 用户 DeepSeek/OpenAI 密钥加密存于 `ai_settings`，支持可选独立 OpenAI 转写密钥；已认证用户的分析、问答、转写只使用自己的密钥。`USER_API_KEY_ENCRYPTION_KEY` 在本地 `.env`，不能提交或丢失。
-- Alembic 已至 `20261008_0004`。本地 PostgreSQL 设置保存、读取、删除通过；测试值已清理，demo 模式随后禁止保存个人密钥。当前仍是 demo 模式，需配置 Supabase 并完成双用户真实验收后才能对外开放。
+```bash
+docker compose exec -T backend python -m pytest -q
+docker compose exec -T backend ruff check app tests scripts
+docker compose exec -T backend alembic current
+docker compose exec -T backend python -m scripts.evaluate_retrieval
+```
 
-## 2026-10-08 本地向量库恢复
+向量重建预检查：
 
-`CHROMA_MODE=embedded` 为本地默认，Chroma 数据写入 `storage/chroma/`（已忽略 Git）；`remote-chroma` profile 保留服务端模式。PostgreSQL 与向量库就绪检查均通过，本地向量写入、重开、按用户过滤检索通过。真实视频与付费模型全链路仍未验收。
+```bash
+docker compose exec -T backend python -m scripts.reindex_vectors --dry-run
+```
 
-## 2026-10-08 一键处理更新
+它支持 `--user-id` 和 `--limit`。重复运行同一 limit 仍从首条开始；并非带检查点的任务恢复。去掉 dry-run 才会写入向量。
 
-`POST /api/v1/videos/{id}/run` 与详情页按钮已串联字幕、分析、入库。测试用模拟下载、模型和向量库验证首次写入失败后重试只重做入库；24 项后端测试通过。真实视频、真实模型服务商和 Supabase 双用户仍待验收。后台为单进程 BackgroundTasks，重启后不会自动恢复挂起任务。
+### 前端验证
 
-## 2026-10-11 恢复提示
+宿主机之前没有可用的 tsc/eslint，依赖在前端容器里。不要直接在正在预览的 `/app` 下运行生产构建，避免覆盖其 `.next`。可在容器内建立临时副本：
 
-本机另一 Python 项目占用了 `127.0.0.1:8000`。VideoMind 本地 `.env` 已将宿主机 API 改为 8001，前端浏览器 API 地址同步改为 8001；容器内部 API 仍为 8000。不要用 `localhost:8000` 的健康响应判断 VideoMind 状态，先检查 `/openapi.json` 是否有 `/api/v1/videos`。本轮 29 项后端测试、全量 Ruff、前端 typecheck/lint/build 及本地 CRUD 冒烟通过；真实 Supabase 和付费模型仍未验收。详见 [运行与功能核查](docs/VERIFICATION_2026-10-11.md)。
+```bash
+docker compose exec frontend sh
+vm_check_dir=$(mktemp -d /tmp/videomind-check.XXXXXX)
+cp -R app components lib public package.json package-lock.json tsconfig.json next-env.d.ts next.config.ts postcss.config.js tailwind.config.ts eslint.config.mjs proxy.ts "$vm_check_dir"/
+ln -s /app/node_modules "$vm_check_dir/node_modules"
+cd "$vm_check_dir"
+npm run build
+npm run typecheck
+npm run lint
+exit
+```
 
-## 2026-10-12 本地能力更新
+构建会生成类型文件，因此先 build 再独立 typecheck。该副本不自动包含 `storage/` 和密钥。复制失败时先核对现有布局，不静默跳过文件。
 
-新增可选 faster-whisper 和 BGE 中文模型，默认不安装；BGE 分段后需要运行 `python -m scripts.reindex_vectors` 为已有视频重新入库。单进程本地服务重启会把中断任务标记为失败以便重试。后端 38 项测试和 Ruff、前端 typecheck/lint/build 通过；真实模型文件没有下载，效果未验收。详细启用方式见 [本地 AI 配置](docs/LOCAL_AI.md)。
+## 8. 已遇到的问题
 
-## 2026-10-13 恢复提示
+1. **端口串项目：**宿主 8000 曾指向其他服务，VideoMind 目前用 8001；前端浏览器地址和 API_PORT 必须对应，容器内部地址仍为 backend:8000。
+2. **挂载或热更新失效：**旧容器曾出现空 `/app`，也曾未加载新代码。先对比容器源码与在线响应；确需重启前确认没有活跃视频任务。
+3. **生产镜像重建：**之前受 apt 软件包下载影响，没有重新证明当前默认镜像可从零构建；属于 R9 未验收项。
+4. **生成文件变动：**开发服务器可能改写 `frontend/next-env.d.ts` 的 dev 类型路径，提交前核对来源，不混入无关改动。
+5. **依赖提示：**检索评测出现 Chroma 遥测签名兼容性提示和 ONNX CPU 提示；评测完成。pytest 有 LangGraph 待弃用提示。不要为消除提示擅自大范围升级依赖。
+6. **未验收不是需要重写：**认证/BYOK/ASR/BGE 已有实现，缺真实账号或模型测试时应补验收，不从零做第二套。
+7. **下载凭证：**Bilibili 等平台可能要求 Cookie。只能在用户授权环境使用，不提交到 Git，不把公共样例的失败推断成核心业务已坏。
 
-未提交工作树继续增加索引安全更新与设置页转写模式提示。后端 41 项测试与 Ruff、前端 typecheck/lint/build 通过。开发容器的自动重载未加载宿主机改动，确认没有活跃任务后重启前后端，在线 API 才返回新字段；详见 [本轮核查](docs/VERIFICATION_2026-10-13.md)。
+## 9. 最近功能提交与证据
 
-## 2026-10-15 知识库更新
+| 提交 | 内容 | 证据 |
+| --- | --- | --- |
+| `064b1b7` | 中文检索评测、基线与工时范围 | `docs/VERIFICATION_2026-10-16.md`，后端 62 项 |
+| `6fce45f` | 分页、AI 摘要搜索和全库分类 | `docs/VERIFICATION_2026-10-15.md`，后端 52 项与前端检查 |
+| `d3637fd` | 向量重建预检查、用户筛选与失败续跑 | `docs/VERIFICATION_2026-10-14.md` |
+| `467c61e` | WebVTT 分钟时间戳修复 | 对应字幕测试与 Git diff |
+| `8e03e73` | 可选本地 AI、索引安全更新和任务中断标记 | `docs/VERIFICATION_2026-10-12.md`、`docs/VERIFICATION_2026-10-13.md` |
 
-`/library` 用 `page` 参数分页，每页 20 条，超过末页时跳回末页；搜索和分类会保留在翻页链接中，重新提交筛选从第一页开始。`GET /api/v1/videos/categories` 返回当前用户全部非空分类，不受当前页限制。后端搜索已包含 AI 标题和摘要。详见 [本轮核查](docs/VERIFICATION_2026-10-15.md)。
+早期 16/29/41 项测试和“未提交”描述是历史记录，不能覆盖最新事实。本次仅整理文档，不重新运行全部代码测试；最近实测日期如上。
 
-## 2026-10-16 检索评测与后续交付
+## 10. 新聊天的第一轮工作
 
-开工时工作树干净，`main` 与 GitHub 的 `6fce45f` 一致。新增 `python -m scripts.evaluate_retrieval`，使用独立内存 Chroma 和固定虚构数据，不读取数据库或现有向量；默认 hash 无需模型 Key，BGE 对照需安装本地依赖。后端 62 项测试与 Ruff 通过，真实检索基线和使用步骤见 [评测说明](docs/RETRIEVAL_EVALUATION.md)。下一步按固定评测验证真实模型，再补上传/编辑、持久队列和存储部署，范围与工时见 [完成计划](docs/COMPLETION_PLAN.md)。
+1. 确认是否能访问真实仓库；若只有 ChatGPT 项目镜像，`sources/` 只读，不在那里修改业务代码。
+2. 读仓库 `AGENTS.md`、本文件、剩余计划和当前 Git；先保护任何后来出现的用户改动。
+3. 用简短中文报告当前状态、下一项 R 编号和验收方法，再继续实现。
+4. 优先 R1；缺少账号时继续不依赖账号的工作。公开测试素材与本地模型下载并不一定需要用户提供。
+5. 完成后运行适当检查，更新有日期证据和任务状态；若当前用户授权同步，再核对远端、提交和推送，不能 force push。
+6. 不能访问仓库时，使用本文件和剩余计划恢复背景，但明确说明未检查代码，不虚构测试或部署成功。
+
+需要用户参与的是账号开通、资源/费用选择、本人验证、真实计费确认及必要的私人素材授权；代码实现、模拟测试、公开样例、本地模型、文档和排障应继续自主推进。
