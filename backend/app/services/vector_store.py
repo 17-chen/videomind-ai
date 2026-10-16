@@ -14,6 +14,9 @@ from app.core.i18n import t
 from app.core.logging import logger
 from app.services.embeddings import current_embedding_service
 
+DOCUMENT_CHUNK_SIZE = 350
+DOCUMENT_CHUNK_OVERLAP = 60
+
 
 @dataclass(frozen=True)
 class VectorSearchResult:
@@ -26,8 +29,8 @@ class VectorSearchResult:
 
 
 class ChromaVectorStore:
-    def __init__(self) -> None:
-        self._client: Any | None = None
+    def __init__(self, *, client: Any | None = None) -> None:
+        self._client = client
 
     def _collection(self) -> Any:
         try:
@@ -173,7 +176,9 @@ def _video_filter(user_id: str, video_id: str) -> dict[str, Any]:
     return {"$and": [{"user_id": user_id}, {"video_id": video_id}]}
 
 
-def _split_document(document: str, chunk_size: int = 350, overlap: int = 60) -> list[str]:
+def _split_document(
+    document: str, chunk_size: int = DOCUMENT_CHUNK_SIZE, overlap: int = DOCUMENT_CHUNK_OVERLAP,
+) -> list[str]:
     text = document.strip()
     if not text:
         return [document]

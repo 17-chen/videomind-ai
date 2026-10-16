@@ -1,0 +1,34 @@
+{
+  "name": "videomind-synthetic-zh-v1",
+  "videos": [
+    {"id": "rag", "user_id": "alice", "title": "RAG 检索增强生成", "document": "RAG 检索增强生成先从知识库检索与问题相关的资料，再让语言模型根据资料回答。视频转写会被分段，文本向量保存到向量数据库。每次回答保留原视频链接，便于核对引用来源。检索质量需要使用固定问题和正确视频列表评估。"},
+    {"id": "chunks", "user_id": "alice", "title": "长视频分段与上下文", "document": "长视频分段需要在语义完整性与模型输入长度之间权衡。重叠窗口保留相邻段落的关联，避免一句话被切断。分段过短可能失去上下文，过长可能稀释主题。检索阶段应先扩大候选，再按视频去重，防止同一视频占满全部结果。"},
+    {"id": "sql", "user_id": "alice", "title": "数据库索引与慢查询", "document": "数据库慢查询首先检查执行计划。B-tree 索引可以减少过滤与排序扫描。复合索引应根据查询条件和排序顺序设计。分页在时间相同时增加唯一 ID 排序，避免页面之间重复或漏掉记录。数据量很大时考虑游标分页。"},
+    {"id": "queue", "user_id": "alice", "title": "后台任务可靠性", "document": "可靠的后台任务需要持久化队列、Worker 和任务状态。服务重启后，队列中尚未确认的任务应可以重新投递。任务必须幂等，重试不应产生重复收费或重复文件。取消操作需要检查点，不能只修改界面上的状态。"},
+    {"id": "keys", "user_id": "alice", "title": "个人模型密钥与账户隔离", "document": "每个登录用户保存自己的模型 API Key。服务端加密密钥，读取接口只返回是否已配置。调用模型时按当前用户读取密钥，服务商向对应账户计费，不能在缺少个人密钥时回退到站长的密钥。向量检索也必须按用户过滤，防止泄露其他人的视频内容。"},
+    {"id": "backup", "user_id": "alice", "title": "备份与灾难恢复", "document": "备份应同时覆盖数据库、生成文件和用户密钥加密主密钥。主密钥丢失后，数据库里保存的加密 API Key 无法解密。备份完成不等于可恢复，需要定期在隔离环境演练还原。向量索引可以依据转写和笔记重新构建。"},
+    {"id": "asr", "user_id": "alice", "title": "字幕与本地语音识别", "document": "视频有字幕时优先解析字幕。没有字幕时可以使用 faster-whisper 在本地进行语音识别，不需要 OpenAI 转写密钥。首次运行需要下载模型，CPU int8 可以减少内存占用。转写速度与准确性要用真实音频测量，不能由模拟模型测试推断。"},
+    {"id": "deploy", "user_id": "alice", "title": "部署检查清单", "document": "部署时要分别检查服务存活和服务就绪。就绪检查应覆盖数据库与向量库。数据库结构由 Alembic 迁移维护。前端和后端的 API 地址必须一致；上线后应验证登录、视频创建、错误反馈和数据持久性。"},
+    {"id": "cooking", "user_id": "alice", "title": "番茄鸡蛋家常做法", "document": "番茄鸡蛋先将鸡蛋炒至凝固后盛出，再炒番茄至出汁，最后混合加盐。切番茄前清洗表面，火候决定口感。这是一段家常烹饪教程。"},
+    {"id": "long-video", "user_id": "alice", "title": "长视频处理实践", "document": "视频知识库的第一步是登记收藏链接，用户可以添加标题和备注。链接可能来自不同的视频平台，分享文本中还可能夹带标点和说明，因此应先提取完整地址。下载阶段保存封面、来源和原始时长，有字幕时直接提取字幕，避免不必要的转写费用。没有字幕时才抽取音频，并根据用户配置选择本地模型或云端服务。视频太长时应提示等待时间，并让用户能看到下载、转写、分析和入库的不同阶段。分析阶段把正文整理为摘要、核心观点和行动建议，生成可复制的 Markdown 笔记。若分析已经完成而向量写入失败，重试时应复用已有笔记，不再次调用模型。一个视频会产生数据库记录、本地媒体文件和向量索引，删除时需要按用户归属清理这些内容。索引模型切换后，旧向量不能直接和新向量混用，需要使用独立集合并重新入库。评估检索质量时，准备固定问题并记录应命中的视频，比较不同模型下的召回率和排名。最后再谈恢复：如果队列中的同一条任务被重复投递，使用幂等任务标识和阶段检查点，就能复用已完成的转写与笔记，避免重复调用付费模型。这一段专门说明重复投递和重复扣费的处理。"},
+    {"id": "bob-rag", "user_id": "bob", "title": "Bob 的私有 RAG 笔记", "document": "RAG 检索增强生成如何保留原视频链接并核对引用来源？这是 Bob 私有的向量知识库视频，回答中不应出现在 Alice 的搜索结果里。"},
+    {"id": "bob-keys", "user_id": "bob", "title": "Bob 的私有密钥笔记", "document": "个人模型 API Key 由当前用户提供，服务商向对应账户计费。不要使用站长的密钥。这是 Bob 的私有视频资料。"}
+  ],
+  "cases": [
+    {"id": "rag-keyword", "user_id": "alice", "question": "RAG 检索增强生成如何保留视频引用来源？", "expected_video_ids": ["rag"]},
+    {"id": "chunk-window", "user_id": "alice", "question": "分段太短失去上下文，重叠窗口有什么作用？", "expected_video_ids": ["chunks"]},
+    {"id": "query-plan", "user_id": "alice", "question": "数据库慢查询如何用执行计划和复合索引排查？", "expected_video_ids": ["sql"]},
+    {"id": "restart-queue", "user_id": "alice", "question": "服务重启后如何重新投递后台任务？", "expected_video_ids": ["queue"]},
+    {"id": "own-billing", "user_id": "alice", "question": "没有个人 API Key 时能用站长的密钥吗？费用由谁承担？", "expected_video_ids": ["keys"]},
+    {"id": "lost-master-key", "user_id": "alice", "question": "加密主密钥丢失之后如何处理已保存的模型密钥？", "expected_video_ids": ["backup", "keys"]},
+    {"id": "local-transcription", "user_id": "alice", "question": "没有字幕也不想用 OpenAI 转写密钥，有什么本地方案？", "expected_video_ids": ["asr"]},
+    {"id": "readiness", "user_id": "alice", "question": "上线时如何检查数据库与向量库是否就绪？", "expected_video_ids": ["deploy"]},
+    {"id": "cooking", "user_id": "alice", "question": "番茄鸡蛋先炒哪个，最后什么时候加盐？", "expected_video_ids": ["cooking"]},
+    {"id": "tail-retry", "user_id": "alice", "question": "重复投递任务时怎样避免重复调用付费模型和重复扣费？", "expected_video_ids": ["queue", "long-video"]},
+    {"id": "paraphrase-trace", "user_id": "alice", "question": "我想核实回答的出处，怎样回到原来的资料？", "expected_video_ids": ["rag"]},
+    {"id": "paraphrase-resume", "user_id": "alice", "question": "程序中途关掉了，下次如何接着处理没有做完的视频？", "expected_video_ids": ["queue", "long-video"]},
+    {"id": "privacy-rag-bob", "user_id": "bob", "question": "RAG 检索增强生成如何保留视频引用来源？", "expected_video_ids": ["bob-rag"]},
+    {"id": "privacy-keys-bob", "user_id": "bob", "question": "个人模型 API Key 向谁计费？", "expected_video_ids": ["bob-keys"]},
+    {"id": "empty-library", "user_id": "charlie", "question": "RAG 检索增强生成如何保留视频引用来源？", "expected_video_ids": []}
+  ]
+}

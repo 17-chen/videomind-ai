@@ -1,6 +1,6 @@
 # VideoMind AI 项目交接
 
-> 更新：2026-10-15。供一段时间未开发后恢复工作；以本地代码和当时的实测结果为准。
+> 更新：2026-10-16。供一段时间未开发后恢复工作；以本地代码和当时的实测结果为准。
 
 ## 项目介绍
 
@@ -96,3 +96,7 @@ DOCKER_HOST=unix:///Users/chenxin/.colima/default/docker.sock docker compose ps
 ## 2026-10-15 知识库更新
 
 `/library` 用 `page` 参数分页，每页 20 条，超过末页时跳回末页；搜索和分类会保留在翻页链接中，重新提交筛选从第一页开始。`GET /api/v1/videos/categories` 返回当前用户全部非空分类，不受当前页限制。后端搜索已包含 AI 标题和摘要。详见 [本轮核查](docs/VERIFICATION_2026-10-15.md)。
+
+## 2026-10-16 检索评测与后续交付
+
+开工时工作树干净，`main` 与 GitHub 的 `6fce45f` 一致。新增 `python -m scripts.evaluate_retrieval`，使用独立内存 Chroma 和固定虚构数据，不读取数据库或现有向量；默认 hash 无需模型 Key，BGE 对照需安装本地依赖。后端 62 项测试与 Ruff 通过，真实检索基线和使用步骤见 [评测说明](docs/RETRIEVAL_EVALUATION.md)。下一步按固定评测验证真实模型，再补上传/编辑、持久队列和存储部署，范围与工时见 [完成计划](docs/COMPLETION_PLAN.md)。

@@ -1,6 +1,6 @@
 # VideoMind AI 当前技术架构
 
-> 核对日期：2026-10-08。描述仓库中的实现与已知边界；不把规划功能写成已完成。
+> 核对日期：2026-10-16。描述仓库中的实现与已知边界；不把规划功能写成已完成。
 
 ## 系统总览
 
@@ -46,15 +46,15 @@ User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一�
 ## 认证边界
 
 - 默认 `AUTH_MODE=demo`：请求使用自动创建的 demo user，方便本地开发；不适合公开多用户服务。
-- 待接入的 `AUTH_MODE=supabase`：前端注册/登录与会话，后端向 Supabase Auth `/auth/v1/user` 验证 Bearer token，按 `auth_subject` 映射本地 User；邮箱冲突不会自动合并。相关代码目前未提交，且本地 Supabase 配置缺失。
+- 已实现的 `AUTH_MODE=supabase`：前端注册/登录与会话，后端向 Supabase Auth `/auth/v1/user` 验证 Bearer token，按 `auth_subject` 映射本地 User；邮箱冲突不会自动合并。代码已提交，真实 Supabase 项目仍待配置与验收。
 - 后端需要 `SUPABASE_URL` 与 `SUPABASE_ANON_KEY`，不再要求 JWT Secret；每次认证请求依赖 Supabase Auth 可用。接入真实项目后须做令牌刷新与双用户隔离测试。
 
 ## 当前限制
 
-- `ASR_PROVIDER=disabled` 为默认值；Supabase 用户可在设置中提供自己的 OpenAI 转写密钥处理无字幕视频，真实外部调用尚未验收。`faster-whisper` 属计划，不是已接入能力。
+- `ASR_PROVIDER=disabled` 为默认值；可选 faster-whisper 本地转写已有接入，或使用当前用户的 OpenAI 转写密钥。真实音频与外部调用尚未验收。
 - `local_hash` 仅是确定性向量方案，用于流程验证；中文语义检索效果待更合适的模型验证。
 - 可选 `bge_zh` 使用单独集合和分段向量；切换模型后需要运行重新入库脚本，真实中文检索质量仍待评测。
-- BackgroundTasks 不提供跨重启持久化、可靠重试或队列隔离；长视频生产处理待改造。
+- BackgroundTasks 不提供跨重启持久化、可靠重试或队列隔离；本地单进程重启会把中断记录标为失败供用户手动重试，生产队列仍待改造。
 - 本地 `storage/` 不等于云端持久对象存储；Chroma 生产持久化/pgvector 迁移未完成。
 - 上传本地视频文件接口、笔记编辑、自动分类修改等初始需求尚未实现或未验收。
 - 视频下载依赖平台规则、网络、Cookie 和 yt-dlp 版本；必须用真实 URL 验证。
@@ -62,6 +62,10 @@ User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一�
 ## 下一步技术演进
 
 按 [阶段路线图](roadmap.md) 完成认证和真实视频闭环，再补 ASR、中文 embedding、可靠队列与云端持久化。长期选择以 [技术决策日志](../DECISION_LOG.md) 为准。
+
+## 检索评测边界
+
+`scripts.evaluate_retrieval` 通过客户端注入，使用独立的 Chroma EphemeralClient 和固定语料，结束后清理内存集合。该命令不使用数据库和持久向量数据，只评估视频级检索与用户隔离。默认 `ChromaVectorStore()` 仍使用上述嵌入式或 HTTP 生产配置；评测不是公开 HTTP 功能。指标和语料边界见 [中文检索评测](RETRIEVAL_EVALUATION.md)。
 
 ## 用户模型配置（2026-10-08）
 

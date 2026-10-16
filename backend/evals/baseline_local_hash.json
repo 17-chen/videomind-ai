@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "dataset_name": "videomind-synthetic-zh-v1",
+  "dataset_sha256": "4294248dddda86abb87d0661b238408366cf53a0bbaea7700e024c93c2066632",
+  "provider": "local_hash",
+  "embedding_model": null,
+  "embedding_dimensions": 384,
+  "top_k": 3,
+  "scope": "retrieval_only_no_generation",
+  "chunking": null,
+  "video_count": 12,
+  "case_count": 15,
+  "relevance_case_count": 14,
+  "empty_library_case_count": 1,
+  "metrics": {
+    "hit_rate_at_k": 1.0,
+    "recall_at_k": 0.9642857142857143,
+    "precision_at_k": 0.38095238095238093,
+    "mrr_at_k": 1.0
+  },
+  "privacy_violation_count": 0,
+  "cases": [
+    {
+      "id": "rag-keyword",
+      "expected_video_ids": [
+        "rag"
+      ],
+      "retrieved_video_ids": [
+        "rag",
+        "long-video",
+        "backup"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "chunk-window",
+      "expected_video_ids": [
+        "chunks"
+      ],
+      "retrieved_video_ids": [
+        "chunks",
+        "cooking",
+        "keys"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "query-plan",
+      "expected_video_ids": [
+        "sql"
+      ],
+      "retrieved_video_ids": [
+        "sql",
+        "deploy",
+        "backup"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "restart-queue",
+      "expected_video_ids": [
+        "queue"
+      ],
+      "retrieved_video_ids": [
+        "queue",
+        "deploy",
+        "long-video"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "own-billing",
+      "expected_video_ids": [
+        "keys"
+      ],
+      "retrieved_video_ids": [
+        "keys",
+        "backup",
+        "long-video"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "lost-master-key",
+      "expected_video_ids": [
+        "backup",
+        "keys"
+      ],
+      "retrieved_video_ids": [
+        "backup",
+        "keys",
+        "asr"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.6666666666666666,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "local-transcription",
+      "expected_video_ids": [
+        "asr"
+      ],
+      "retrieved_video_ids": [
+        "asr",
+        "backup",
+        "keys"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "readiness",
+      "expected_video_ids": [
+        "deploy"
+      ],
+      "retrieved_video_ids": [
+        "deploy",
+        "rag",
+        "sql"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "cooking",
+      "expected_video_ids": [
+        "cooking"
+      ],
+      "retrieved_video_ids": [
+        "cooking",
+        "asr",
+        "long-video"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "tail-retry",
+      "expected_video_ids": [
+        "queue",
+        "long-video"
+      ],
+      "retrieved_video_ids": [
+        "long-video",
+        "queue",
+        "sql"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.6666666666666666,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "paraphrase-trace",
+      "expected_video_ids": [
+        "rag"
+      ],
+      "retrieved_video_ids": [
+        "rag",
+        "long-video",
+        "queue"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "paraphrase-resume",
+      "expected_video_ids": [
+        "queue",
+        "long-video"
+      ],
+      "retrieved_video_ids": [
+        "long-video",
+        "rag",
+        "chunks"
+      ],
+      "hit": true,
+      "recall": 0.5,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "privacy-rag-bob",
+      "expected_video_ids": [
+        "bob-rag"
+      ],
+      "retrieved_video_ids": [
+        "bob-rag",
+        "bob-keys"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "privacy-keys-bob",
+      "expected_video_ids": [
+        "bob-keys"
+      ],
+      "retrieved_video_ids": [
+        "bob-keys",
+        "bob-rag"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.3333333333333333,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "empty-library",
+      "expected_video_ids": [],
+      "retrieved_video_ids": [],
+      "hit": null,
+      "recall": null,
+      "precision": null,
+      "reciprocal_rank": null,
+      "foreign_or_unknown_video_ids": []
+    }
+  ],
+  "checks": {
+    "privacy_passed": true,
+    "recall_threshold_passed": null
+  },
+  "passed": true,
+  "minimum_recall": null
+}
