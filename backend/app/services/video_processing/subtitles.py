@@ -10,6 +10,14 @@ TIMESTAMP_PATTERN = re.compile(
 )
 WEBVTT_PATTERN = re.compile(r"^WEBVTT|^Kind:|^Language:", re.IGNORECASE)
 TAG_PATTERN = re.compile(r"<[^>]+>")
+SUBTITLE_LANGUAGES = ("zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh", "en")
+
+
+def _subtitle_priority(path: Path, video_id: str) -> tuple[int, bool, str]:
+    language = path.stem.removeprefix(f"{video_id}.").lower()
+    preferred = [item.lower() for item in SUBTITLE_LANGUAGES]
+    rank = preferred.index(language) if language in preferred else len(preferred)
+    return rank, path.suffix.lower() != ".vtt", path.name
 
 
 def find_downloaded_subtitles(video_id: str) -> SubtitleResult | None:
@@ -23,7 +31,7 @@ def find_downloaded_subtitles(video_id: str) -> SubtitleResult | None:
         if path.suffix.lower() in {".vtt", ".srt"}
     ]
 
-    for subtitle_file in subtitle_files:
+    for subtitle_file in sorted(subtitle_files, key=lambda path: _subtitle_priority(path, video_id)):
         content = _parse_subtitle_text(subtitle_file)
         if content:
             _persist_transcript_file(video_id=video_id, content=content)

@@ -4,6 +4,7 @@ from typing import Any
 from app.core.config import settings
 from app.core.i18n import t
 from app.services.video_processing.errors import VideoProcessingError
+from app.services.video_processing.subtitles import SUBTITLE_LANGUAGES
 from app.services.video_processing.types import DownloadedVideo
 from app.services.videos import detect_video_source
 
@@ -30,7 +31,7 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
         "no_warnings": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
-        "subtitleslangs": ["zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh", "en"],
+        "subtitleslangs": list(SUBTITLE_LANGUAGES),
         "subtitlesformat": "vtt/srt/best",
         "socket_timeout": 30,
         "retries": 3,
