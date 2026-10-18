@@ -14,7 +14,9 @@
 
 ## 远端 CI
 
-首次 GitHub Actions 运行结果待推送后补充。工作流的固定检索门槛仅用于防止当前虚构语料回归；不等同于真实 BGE、ASR、真实视频、生成答案或真实 Supabase 验收。
+首次 GitHub Actions 运行 [39103574463](https://github.com/17-chen/videomind-ai/actions/runs/39103574463)：前端通过，后端 60 项通过、1 项失败、2 项初始化失败。失败原因是三个 API 测试会启动应用并连接 PostgreSQL，而最初的 CI 配置没有数据库服务，默认主机名 `postgres` 在 GitHub runner 上无法解析。随后为后端任务增加临时 PostgreSQL 16 服务和 CI 专用连接地址；修复后的运行结果待补充。
+
+工作流的固定检索门槛仅用于防止当前虚构语料回归；不等同于真实 BGE、ASR、真实视频、生成答案或真实 Supabase 验收。
 
 ## R1 条件
 
