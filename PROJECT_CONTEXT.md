@@ -31,7 +31,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-10-18 补充：**先快进合入 GitHub 的 `700ccde` 字幕选择修复，随后添加推送与 PR 自动检查，覆盖后端测试/Ruff/固定 hash 检索和前端构建/typecheck/lint。本地后端 63 项通过，Ruff 通过，虚构语料 Recall@3 为 96.43%、隔离违规 0；前端临时副本的 build/typecheck/lint 通过。远端 CI 首次运行结果见 [本轮核查](docs/VERIFICATION_2026-10-18.md)。R1 真实本地模型依赖尚未安装，真实音频、BGE、外部服务仍未验收。
+**2026-10-18 补充：**先快进合入 GitHub 的 `700ccde` 字幕选择修复，随后添加推送与 PR 自动检查，覆盖后端测试/Ruff/固定 hash 检索和前端构建/typecheck/lint。本地后端 63 项通过，Ruff 通过，虚构语料 Recall@3 为 96.43%、隔离违规 0；前端临时副本的 build/typecheck/lint 通过。远端首次运行暴露 PostgreSQL 服务缺失；修复后的 [GitHub CI](https://github.com/17-chen/videomind-ai/actions/runs/39103657908) 两个任务均通过，详见 [本轮核查](docs/VERIFICATION_2026-10-18.md)。R1 真实本地模型依赖尚未安装，真实音频、BGE、外部服务仍未验收。
 
 **当前验证（2026-10-16）：**后端 62 项测试和 Ruff 通过；12 条虚构文本、15 道问题的真实 hash + 内存 Chroma 评测完成，Recall@3 为 96.43%，隔离违规为 0。漏检与小样本边界见 [检索评测](docs/RETRIEVAL_EVALUATION.md)。本轮未改前端，最近一次前端构建与页面检查为 2026-10-15，详见 [上轮核查](docs/VERIFICATION_2026-10-15.md)。
 

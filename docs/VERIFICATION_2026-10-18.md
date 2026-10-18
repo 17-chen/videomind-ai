@@ -14,7 +14,9 @@
 
 ## 远端 CI
 
-首次 GitHub Actions 运行 [39103574463](https://github.com/17-chen/videomind-ai/actions/runs/39103574463)：前端通过，后端 60 项通过、1 项失败、2 项初始化失败。失败原因是三个 API 测试会启动应用并连接 PostgreSQL，而最初的 CI 配置没有数据库服务，默认主机名 `postgres` 在 GitHub runner 上无法解析。随后为后端任务增加临时 PostgreSQL 16 服务和 CI 专用连接地址；修复后的运行结果待补充。
+首次 GitHub Actions 运行 [39103574463](https://github.com/17-chen/videomind-ai/actions/runs/39103574463)：前端通过，后端 60 项通过、1 项失败、2 项初始化失败。失败原因是三个 API 测试会启动应用并连接 PostgreSQL，而最初的 CI 配置没有数据库服务，默认主机名 `postgres` 在 GitHub runner 上无法解析。随后为后端任务增加临时 PostgreSQL 16 服务和 CI 专用连接地址。
+
+修复后 [运行 39103657908](https://github.com/17-chen/videomind-ai/actions/runs/39103657908) 的后端和前端任务均成功，后端测试、Ruff、固定检索门槛以及前端 build/typecheck/lint 全部执行。GitHub artifact `retrieval-report` 已确认存在。平台给出的旧 Node.js action 运行时弃用和未来 Ubuntu runner 迁移提示未导致失败；后续升级 action 时再单独核对。
 
 工作流的固定检索门槛仅用于防止当前虚构语料回归；不等同于真实 BGE、ASR、真实视频、生成答案或真实 Supabase 验收。
 
