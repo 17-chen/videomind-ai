@@ -12,7 +12,7 @@ http://localhost:8000/docs
 
 ### `POST /api/v1/videos`
 
-提交一个视频 URL，创建视频处理任务。Phase 2 只入库并返回 `queued` 状态，真正的视频下载、字幕和 AI 分析会在 Phase 3/4 接入。
+提交一个视频 URL，创建归属于当前用户的待处理记录，返回 `created`；处理由 `/process` 或 `/run` 显式启动。
 
 请求体：
 
@@ -31,7 +31,7 @@ http://localhost:8000/docs
 {
   "id": "video_id",
   "user_id": "user_id",
-  "status": "queued",
+  "status": "created",
   "source": "bilibili",
   "url": "https://www.bilibili.com/video/...",
   "title": "可选标题",
@@ -58,6 +58,12 @@ http://localhost:8000/docs
 
 响应的 `total` 为筛选后的视频总数；排序为创建时间倒序、ID 倒序。前端 `/library` 使用从 1 开始的 `page` 参数转换为 offset，每页 20 条。
 
+### `GET /api/v1/videos/upload-policy` 与 `POST /api/v1/videos/upload`
+
+前者返回当前服务端的 `max_bytes` 和支持的扩展名；后者使用 `multipart/form-data` 的 `file` 与可选 `title` 上传本人视频。支持 MP4、WebM、MKV、MOV、M4V，并要求 MIME 合理、大小不超过限制、ffprobe 能识别实际视频流。服务端生成保存文件名，不使用客户端路径。成功返回视频详情，`source=upload`、`status=created`；重复上传同一内容返回 409，超限返回 413，不支持或无效媒体返回 415。上传资料的问答来源指向应用内详情页。
+
+上传后可调用已有的 `/process` 或 `/run`，跳过 yt-dlp 并对本地文件提取音频。若未启用本地 ASR，也未配置本人可用的 OpenAI 转写密钥，处理会失败并显示提示。当前真实模型与服务商完整链路尚未验收。
+
 ### `GET /api/v1/videos/categories`
 
 返回当前用户整个视频库中的非空分类字符串数组，去重并排序，不受列表分页或搜索条件影响。Supabase 模式下需要有效用户令牌。
@@ -73,11 +79,10 @@ http://localhost:8000/docs
 当前 Pipeline：
 
 ```text
-Video URL
--> yt-dlp 下载视频与字幕
--> 优先解析字幕
+Video URL → yt-dlp 下载视频与字幕 → 优先解析字幕
+或本地上传 → 读取服务端保存的视频文件
 -> 无字幕时使用 ffmpeg 提取音频
--> Whisper ASR 转写
+-> 配置的本地或用户本人云端 ASR 转写
 -> Transcript 入库
 -> 更新 Video 状态
 ```
@@ -87,7 +92,7 @@ Video URL
 ```json
 {
   "id": "video_id",
-  "status": "processing",
+  "status": "downloading",
   "message": "视频处理任务已启动"
 }
 ```
@@ -109,9 +114,8 @@ Transcript
 要求：
 
 - 视频必须已经有 transcript。
-- `.env` 必须配置 `DEEPSEEK_API_KEY`。
-- 默认 LLM Provider 使用 DeepSeek。
-- 默认模型使用 `LLM_MODEL=deepseek-v4-flash`。
+- 已认证用户必须先在个人设置中保存自己的模型配置；缺 Key 时不会回退到项目所有者密钥。
+- 默认 Provider 是 DeepSeek，新配置默认模型为 `deepseek-flash`。
 
 ### `POST /api/v1/videos/{id}/embed`
 
@@ -133,7 +137,7 @@ Video metadata
 
 - 视频至少需要有 transcript 或 AI summary。
 - 当前默认 `EMBEDDING_PROVIDER=local_hash`，不依赖 OpenAI。
-- 后续可以替换为 bge-m3、sentence-transformers 或托管 embedding 服务。
+- 可选 `bge_zh` 使用独立集合与分段索引；真实模型效果尚未验收。
 
 响应：
 

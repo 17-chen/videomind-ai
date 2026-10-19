@@ -29,7 +29,7 @@ def run_video_workflow(db: Session, video: Video) -> Video:
     stage = "download"
     try:
         if video.transcript is None or not video.transcript.content.strip():
-            update_video_status(db, video, VideoStatus.DOWNLOADING)
+            update_video_status(db, video, VideoStatus.TRANSCRIBING if video.source == "upload" else VideoStatus.DOWNLOADING)
             process_video(db, video, final_status=VideoStatus.ANALYZING)
 
         if video.summary is None:

@@ -17,7 +17,7 @@ async function request<T>(path: string, init?: RequestInit, accessToken?: string
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers
     },
@@ -76,6 +76,19 @@ export async function createVideo(payload: { url: string; title?: string; descri
     method: "POST",
     body: JSON.stringify(payload)
   });
+}
+
+export type UploadPolicy = { max_bytes: number; extensions: string[] };
+
+export async function getUploadPolicy() {
+  return request<UploadPolicy>("/videos/upload-policy");
+}
+
+export async function uploadVideo(file: File, title?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (title?.trim()) form.append("title", title.trim());
+  return request<Video>("/videos/upload", { method: "POST", body: form });
 }
 
 export async function deleteVideo(id: string) {

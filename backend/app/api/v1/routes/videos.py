@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
@@ -11,6 +11,7 @@ from app.services.ai_settings import resolve_llm
 from app.services.analysis import analyze_video as analyze_video_summary
 from app.services.rag import index_video
 from app.services.video_processing.pipeline import process_video_by_id
+from app.services.video_upload import save_uploaded_video, upload_policy
 from app.services.video_workflow import run_video_workflow_by_id
 from app.services.videos import (
     claim_video_operation,
@@ -39,6 +40,22 @@ def submit_video(
     current_user: User = Depends(get_current_user),
 ) -> VideoRead:
     video = create_video(db=db, user=current_user, payload=payload)
+    return VideoRead.model_validate(video)
+
+
+@router.get("/upload-policy", summary="获取视频上传限制")
+def get_upload_policy(current_user: User = Depends(get_current_user)) -> dict:
+    return upload_policy()
+
+
+@router.post("/upload", response_model=VideoRead, status_code=status.HTTP_201_CREATED, summary="上传本地视频")
+def upload_video(
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None, max_length=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoRead:
+    video = save_uploaded_video(db=db, user=current_user, file=file, title=title)
     return VideoRead.model_validate(video)
 
 

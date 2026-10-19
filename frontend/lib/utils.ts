@@ -43,7 +43,8 @@ export function sourceLabel(source: string | null) {
     bilibili: "Bilibili",
     douyin: "抖音",
     youtube: "YouTube",
-    tiktok: "TikTok"
+    tiktok: "TikTok",
+    upload: "本地上传"
   };
   return source ? map[source] ?? source : "未知来源";
 }

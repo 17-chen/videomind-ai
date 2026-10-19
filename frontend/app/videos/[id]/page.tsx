@@ -44,7 +44,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
                 </div>
               )}
               <div className="absolute left-5 top-5 flex flex-wrap gap-2">
-                <Badge className="bg-white/90 text-foreground">{sourceLabel(video.source)}</Badge>
+                <Badge className="bg-white/90 text-foreground">{tx(sourceLabel(video.source))}</Badge>
                 <Badge className="bg-white/90 text-foreground">{tx(videoStageLabel(video))}</Badge>
               </div>
             </div>

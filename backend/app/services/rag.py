@@ -43,7 +43,7 @@ def index_video(db: Session, video: Video) -> Embedding:
         user_id=video.user_id,
         video_id=video.id,
         title=title,
-        url=video.url,
+        url=f"/videos/{video.id}" if video.source == "upload" else video.url,
         category=category,
         source=video.source,
         document=document,

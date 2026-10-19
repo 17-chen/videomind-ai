@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-18。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-10-19。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 ## 项目基本信息
 
@@ -30,6 +30,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-10-19 补充：**R3 本地视频上传入口、文件验证、按用户重复保护和处理路径已实现。自生成短视频经运行中 API 上传、重复拒绝、详情和删除清理通过；模拟转写、笔记、入库工作流通过，66 项后端测试/Ruff 和前端 build/typecheck/lint 通过。本机 PostgreSQL 迁移至 `20261019_0005` 前已在不入 Git 的 `storage/backups/` 保存备份。真实 ASR、用户模型与 Supabase 双用户验收仍缺；详情见 [核查记录](docs/VERIFICATION_2026-10-19.md)。
 
 **2026-10-18 补充：**先快进合入 GitHub 的 `700ccde` 字幕选择修复，随后添加推送与 PR 自动检查，覆盖后端测试/Ruff/固定 hash 检索和前端构建/typecheck/lint。本地后端 63 项通过，Ruff 通过，虚构语料 Recall@3 为 96.43%、隔离违规 0；前端临时副本的 build/typecheck/lint 通过。远端首次运行暴露 PostgreSQL 服务缺失；修复后的 [GitHub CI](https://github.com/17-chen/videomind-ai/actions/runs/39103657908) 两个任务均通过，详见 [本轮核查](docs/VERIFICATION_2026-10-18.md)。R1 真实本地模型依赖尚未安装，真实音频、BGE、外部服务仍未验收。
 

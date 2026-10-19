@@ -56,7 +56,7 @@ def claim_video_operation(db: Session, video: Video, next_status: VideoStatus) -
 
 
 def mark_video_processing(db: Session, video: Video) -> Video:
-    return claim_video_operation(db, video, VideoStatus.DOWNLOADING)
+    return claim_video_operation(db, video, VideoStatus.TRANSCRIBING if video.source == "upload" else VideoStatus.DOWNLOADING)
 
 
 def update_video_status(

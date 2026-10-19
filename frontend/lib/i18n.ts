@@ -1,6 +1,17 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "本地上传": ["本地上传", "Local upload"],
+  "本地上传的视频": ["本地上传的视频", "Locally uploaded video"],
+  "或上传本地视频": ["或上传本地视频", "Or upload a local video"],
+  "上传标题，可选": ["上传标题，可选", "Upload title (optional)"],
+  "最大文件大小": ["最大文件大小", "Maximum file size"],
+  "不支持这种视频格式": ["不支持这种视频格式", "This video format is not supported."],
+  "视频文件超过上传限制": ["视频文件超过上传限制", "The video exceeds the upload limit."],
+  "无法读取上传限制，请稍后重试": ["无法读取上传限制，请稍后重试", "Could not load upload limits. Try again later."],
+  "上传失败": ["上传失败", "Upload failed"],
+  "上传中，请稍候": ["上传中，请稍候", "Uploading, please wait"],
+  "上传到我的记忆": ["上传到我的记忆", "Upload to my memory"],
   "视频库分页": ["视频库分页", "Library pagination"],
   "上一页": ["上一页", "Previous"],
   "下一页": ["下一页", "Next"],

@@ -1,6 +1,6 @@
 # VideoMind AI 当前技术架构
 
-> 核对日期：2026-10-16。描述仓库中的实现与已知边界；不把规划功能写成已完成。
+> 核对日期：2026-10-19。描述仓库中的实现与已知边界；不把规划功能写成已完成。
 
 ## 系统总览
 
@@ -20,8 +20,8 @@ FastAPI /api/v1
 
 ## 业务流程与状态
 
-1. 前端提交 Bilibili/抖音 URL 或分享文本；后端创建归属于当前用户的 Video 记录。
-2. `POST /videos/{id}/process` 启动 BackgroundTask：yt-dlp 下载视频及字幕；有字幕时解析字幕，没有时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
+1. 前端提交 Bilibili/抖音 URL 或分享文本，或上传本地视频；后端创建归属于当前用户的 Video 记录。上传使用服务端 ID 命名、哈希防本人重复及 ffprobe 内容校验。
+2. `POST /videos/{id}/process` 启动 BackgroundTask：URL 视频由 yt-dlp 下载并优先解析字幕；本地上传直接读取本人已保存文件。没有字幕时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
 3. `POST /videos/{id}/analyze` 使用 LangGraph Video Analysis Agent 和 DeepSeek，生成结构化 Summary 与 Markdown 笔记。
 4. `POST /videos/{id}/embed` 拼接视频、转写和摘要文本，默认用 local_hash 生成向量；可选 bge_zh 对长文档分段。向量写入 Chroma，PostgreSQL 保存视频级向量 ID。
 5. `POST /chat` 按 user_id 检索 Chroma 结果，再调用 DeepSeek 生成中文回答并返回视频来源。
@@ -56,7 +56,7 @@ User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一�
 - 可选 `bge_zh` 使用单独集合和分段向量；切换模型后需要运行重新入库脚本，真实中文检索质量仍待评测。
 - BackgroundTasks 不提供跨重启持久化、可靠重试或队列隔离；本地单进程重启会把中断记录标为失败供用户手动重试，生产队列仍待改造。
 - 本地 `storage/` 不等于云端持久对象存储；Chroma 生产持久化/pgvector 迁移未完成。
-- 上传本地视频文件接口、笔记编辑、自动分类修改等初始需求尚未实现或未验收。
+- 本地上传入口已有实现和自生成视频的上传/删除烟测；上传到真实 ASR、笔记、入库仍待实际服务验收。笔记编辑、自动分类修改仍未实现。
 - 视频下载依赖平台规则、网络、Cookie 和 yt-dlp 版本；必须用真实 URL 验证。
 
 ## 下一步技术演进

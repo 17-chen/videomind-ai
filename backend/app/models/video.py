@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -29,6 +29,7 @@ class VideoStatus(StrEnum):
 
 class Video(IdMixin, TimestampMixin, Base):
     __tablename__ = "videos"
+    __table_args__ = (UniqueConstraint("user_id", "upload_sha256", name="uq_videos_user_upload_sha256"),)
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     url: Mapped[str] = mapped_column(Text, nullable=False)
@@ -40,6 +41,7 @@ class Video(IdMixin, TimestampMixin, Base):
     source: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     media_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    upload_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     audio_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

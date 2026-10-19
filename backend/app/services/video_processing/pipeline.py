@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,7 @@ from app.services.video_processing.downloader import download_video
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.subtitles import find_downloaded_subtitles
 from app.services.video_processing.transcriber import ensure_local_asr_available, transcribe_audio
+from app.services.video_processing.types import DownloadedVideo
 
 
 def process_video_by_id(video_id: str) -> None:
@@ -35,7 +37,12 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
     logger.info("Starting video processing pipeline for {}", video.id)
 
     try:
-        downloaded = download_video(url=video.url, video_id=video.id)
+        if video.source == "upload":
+            if not video.media_path or not Path(video.media_path).is_file():
+                raise VideoProcessingError("上传的视频文件不存在，请重新上传")
+            downloaded = DownloadedVideo(video_id=video.id, url=video.url, file_path=video.media_path)
+        else:
+            downloaded = download_video(url=video.url, video_id=video.id)
         video.media_path = downloaded.file_path
         video.title = video.title or downloaded.title
         video.description = video.description or downloaded.description
