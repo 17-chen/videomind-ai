@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, JSON, String, Text
+from sqlalchemy import Boolean, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -26,5 +26,6 @@ class Summary(IdMixin, TimestampMixin, Base):
     target_audience: Mapped[str | None] = mapped_column(String(255), nullable=True)
     analysis_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     markdown_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_is_manual: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     video: Mapped["Video"] = relationship(back_populates="summary")

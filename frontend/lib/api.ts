@@ -71,6 +71,18 @@ export async function getVideo(id: string, accessToken?: string) {
   return request<Video>(`/videos/${id}`, undefined, accessToken);
 }
 
+export async function updateVideo(id: string, payload: { title: string; description: string; tags: string[]; category: string }) {
+  return request<Video>(`/videos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export async function updateVideoNote(id: string, markdown_note: string) {
+  return request<Video>(`/videos/${id}/note`, { method: "PUT", body: JSON.stringify({ markdown_note }) });
+}
+
+export async function syncVideoIndex(id: string) {
+  return request<Video>(`/videos/${id}/sync-index`, { method: "POST" });
+}
+
 export async function createVideo(payload: { url: string; title?: string; description?: string; tags: string[] }) {
   return request<Video>("/videos", {
     method: "POST",

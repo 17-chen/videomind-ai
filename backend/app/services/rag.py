@@ -35,8 +35,8 @@ def index_video(db: Session, video: Video) -> Embedding:
     if not document.strip():
         raise ApiError(t("embedding_source_required"), status.HTTP_400_BAD_REQUEST)
 
-    title = video.summary.title if video.summary and video.summary.title else video.title or "未命名视频"
-    category = video.summary.category if video.summary else None
+    title = video.title or (video.summary.title if video.summary else None) or "未命名视频"
+    category = video.user_category or (video.summary.category if video.summary else None)
     vector_id = f"video:{video.id}"
     vector_store.upsert_video_document(
         vector_id=vector_id,
@@ -55,6 +55,7 @@ def index_video(db: Session, video: Video) -> Embedding:
         db.add(embedding)
     else:
         embedding.vector_id = vector_id
+    video.index_sync_error = None
     db.commit()
     db.refresh(embedding)
     return embedding
@@ -81,14 +82,15 @@ def build_video_document(video: Video) -> str:
         chunks.append(f"来源：{video.source}")
     if video.tags:
         chunks.append(f"用户标签：{', '.join(video.tags)}")
+    category = video.user_category or (video.summary.category if video.summary else None)
+    if category:
+        chunks.append(f"分类：{category}")
 
     if video.summary:
         summary = video.summary
         if summary.title:
             chunks.append(f"AI 标题：{summary.title}")
         chunks.append(f"一句话总结：{summary.summary}")
-        if summary.category:
-            chunks.append(f"分类：{summary.category}")
         if summary.keywords:
             chunks.append(f"关键词：{', '.join(summary.keywords)}")
         if summary.key_points:

@@ -20,8 +20,6 @@ def analyze_video(db: Session, video: Video) -> Summary:
         user=video.user,
         video_title=video.title,
     )
-    _persist_markdown_note(video_id=video.id, markdown_note=markdown_note)
-
     summary = video.summary
     if summary is None:
         summary = Summary(video_id=video.id, summary=analysis.summary)
@@ -38,7 +36,9 @@ def analyze_video(db: Session, video: Video) -> Summary:
     summary.difficulty_level = analysis.difficulty_level
     summary.target_audience = analysis.target_audience
     summary.analysis_json = analysis.model_dump()
-    summary.markdown_note = markdown_note
+    if not summary.note_is_manual:
+        _persist_markdown_note(video_id=video.id, markdown_note=markdown_note)
+        summary.markdown_note = markdown_note
 
     db.add(summary)
     db.commit()

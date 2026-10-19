@@ -33,7 +33,7 @@ export function VideoList({ videos }: { videos: Video[] }) {
 
             <div className="min-w-0 space-y-3">
               <Link href={`/videos/${video.id}`} className="block text-2xl font-black leading-tight hover:text-accent">
-                {video.summary?.title ?? video.title ?? tx("Untitled Memory")}
+                {video.title ?? video.summary?.title ?? tx("Untitled Memory")}
               </Link>
               <p className="line-clamp-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                 {video.summary?.summary ?? video.description ?? (video.source === "upload" ? tx("本地上传的视频") : video.url)}
@@ -41,7 +41,7 @@ export function VideoList({ videos }: { videos: Video[] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-white">{tx(sourceLabel(video.source))}</Badge>
                 <Badge className="bg-white">{tx(videoStageLabel(video))}</Badge>
-                {video.summary?.category ? <Badge className="border-accent/30 bg-accent/10 text-foreground">{video.summary.category}</Badge> : null}
+                {video.user_category || video.summary?.category ? <Badge className="border-accent/30 bg-accent/10 text-foreground">{video.user_category || video.summary?.category}</Badge> : null}
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock size={13} />
                   {formatDate(video.created_at, language)}

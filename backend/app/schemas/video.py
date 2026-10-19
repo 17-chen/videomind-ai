@@ -24,6 +24,24 @@ class VideoCreate(BaseModel):
         return match.group(0).rstrip(")]}〉》」』、，。！？；：")
 
 
+class VideoUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, max_length=10000)
+    tags: list[str] | None = Field(default=None, max_length=20)
+    category: str | None = Field(default=None, max_length=120)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and any(not tag.strip() or len(tag) > 60 for tag in value):
+            raise ValueError("每个标签需为 1–60 个字符")
+        return value
+
+
+class VideoNoteUpdate(BaseModel):
+    markdown_note: str = Field(max_length=100000)
+
+
 class TranscriptRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, title="转写文本")
 
@@ -49,6 +67,7 @@ class SummaryRead(BaseModel):
     target_audience: str | None = Field(title="目标受众")
     analysis_json: dict = Field(title="结构化分析 JSON")
     markdown_note: str | None = Field(title="Markdown 笔记")
+    note_is_manual: bool = Field(title="是否为手工笔记")
     created_at: datetime = Field(title="创建时间")
     updated_at: datetime = Field(title="更新时间")
 
@@ -61,6 +80,8 @@ class VideoRead(BaseModel):
     url: str = Field(title="视频链接")
     title: str | None = Field(title="标题")
     description: str | None = Field(title="描述")
+    user_category: str | None = Field(title="用户分类")
+    index_sync_error: str | None = Field(title="知识库同步状态")
     duration: int | None = Field(title="视频时长", description="单位：秒。")
     thumbnail: str | None = Field(title="封面图")
     status: str = Field(

@@ -4,6 +4,7 @@ import { ArrowLeft, Bot, Calendar, FileText, MessageCircle, MessageSquareQuote, 
 import { AppShell } from "@/components/app-shell";
 import { VideoActions } from "@/components/video-actions";
 import { NoteActions } from "@/components/note-actions";
+import { VideoEditor } from "@/components/video-editor";
 import { Badge, EmptyState, Panel } from "@/components/ui";
 import { getVideo } from "@/lib/api";
 import { formatDate, sourceLabel, videoStageLabel } from "@/lib/utils";
@@ -19,7 +20,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
   const { id } = await params;
   const accessToken = await getServerAccessToken();
   const video = await getVideo(id, accessToken);
-  const title = video.summary?.title ?? video.title ?? tx("未命名视频");
+  const title = video.title ?? video.summary?.title ?? tx("未命名视频");
   const summary = video.summary?.summary ?? tx("这条视频还在等待 AI 理解。完成处理和分析后，它会变成一张可回顾、可追问的知识卡片。");
   const points = video.summary?.key_points ?? [];
 
@@ -52,7 +53,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
             <div className="flex flex-col justify-between gap-8">
               <div>
                 <div className="flex flex-wrap gap-2">
-                  {video.summary?.category ? <Badge className="border-accent/30 bg-accent/10 text-foreground">{video.summary.category}</Badge> : null}
+                  {video.user_category || video.summary?.category ? <Badge className="border-accent/30 bg-accent/10 text-foreground">{video.user_category || video.summary?.category}</Badge> : null}
                   <Badge className="bg-white">{tx("Knowledge Card")}</Badge>
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[0.98] tracking-normal sm:text-6xl">{title}</h1>
@@ -123,9 +124,10 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
                 <MessageSquareQuote size={20} className="text-foreground" />
                 <h2 className="text-2xl font-black">{tx("Markdown Notes")}</h2>
               </div>
-              {video.summary?.markdown_note ? (
+              {video.summary ? (
                 <div className="space-y-3">
-                  <NoteActions title={title} content={video.summary.markdown_note} />
+                  <NoteActions title={title} content={video.summary.markdown_note ?? ""} />
+                  <VideoEditor video={video} mode="note" />
                   <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-[24px] border border-border bg-white p-5 text-sm leading-7">
                     {video.summary.markdown_note}
                   </pre>
@@ -137,10 +139,12 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
           </div>
 
           <aside className="space-y-4">
+            <Panel className="p-6"><VideoEditor video={video} mode="metadata" /></Panel>
             <Panel className="sticky top-24 p-6">
               <p className="text-2xl font-black">{tx("AI Actions")}</p>
               <p className="mb-5 mt-2 text-sm leading-6 text-muted-foreground">{tx("按顺序让这条视频进入你的长期记忆。")}</p>
               <VideoActions video={video} />
+              {video.index_sync_error ? <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{video.index_sync_error}</p> : null}
             </Panel>
 
             <Panel className="p-6">

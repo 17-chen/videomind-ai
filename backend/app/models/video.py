@@ -35,6 +35,8 @@ class Video(IdMixin, TimestampMixin, Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_category: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    index_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
     thumbnail: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default=VideoStatus.CREATED.value, index=True, nullable=False)

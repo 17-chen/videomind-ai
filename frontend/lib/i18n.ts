@@ -1,6 +1,19 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "编辑 Markdown 笔记": ["编辑 Markdown 笔记", "Edit Markdown notes"],
+  "保存后成为手工笔记；再次运行 AI 分析会更新摘要，但保留手工笔记。": ["保存后成为手工笔记；再次运行 AI 分析会更新摘要，但保留手工笔记。", "Saved notes become manual notes. AI analysis can update the summary but keeps your manual notes."],
+  "保存笔记": ["保存笔记", "Save notes"],
+  "编辑资料": ["编辑资料", "Edit details"],
+  "标题": ["标题", "Title"],
+  "备注": ["备注", "Description"],
+  "标签（逗号分隔，最多 20 个，每个最多 60 字）": ["标签（逗号分隔，最多 20 个，每个最多 60 字）", "Tags (comma separated, up to 20, 60 characters each)"],
+  "标签最多 20 个，每个最多 60 字": ["标签最多 20 个，每个最多 60 字", "Use up to 20 tags, 60 characters each."],
+  "保存资料": ["保存资料", "Save details"],
+  "重试知识库同步": ["重试知识库同步", "Retry library sync"],
+  "已保存，并已同步知识库": ["已保存，并已同步知识库", "Saved and synced to the library"],
+  "知识库已同步": ["知识库已同步", "Library synced"],
+  "同步失败": ["同步失败", "Sync failed"],
   "本地上传": ["本地上传", "Local upload"],
   "本地上传的视频": ["本地上传的视频", "Locally uploaded video"],
   "或上传本地视频": ["或上传本地视频", "Or upload a local video"],

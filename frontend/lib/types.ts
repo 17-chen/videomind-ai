@@ -36,6 +36,7 @@ export type Summary = {
   target_audience: string | null;
   analysis_json: Record<string, unknown>;
   markdown_note: string | null;
+  note_is_manual: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -46,6 +47,8 @@ export type Video = {
   url: string;
   title: string | null;
   description: string | null;
+  user_category: string | null;
+  index_sync_error: string | null;
   duration: number | null;
   thumbnail: string | null;
   status: "queued" | "processing" | "completed" | "failed" | string;

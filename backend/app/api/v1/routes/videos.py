@@ -6,7 +6,7 @@ from app.core.i18n import t
 from app.models.user import User
 from app.models.video import VideoStatus
 from app.schemas.rag import VideoEmbedResponse
-from app.schemas.video import VideoAnalyzeResponse, VideoCreate, VideoListResponse, VideoProcessResponse, VideoRead
+from app.schemas.video import VideoAnalyzeResponse, VideoCreate, VideoListResponse, VideoNoteUpdate, VideoProcessResponse, VideoRead, VideoUpdate
 from app.services.ai_settings import resolve_llm
 from app.services.analysis import analyze_video as analyze_video_summary
 from app.services.rag import index_video
@@ -21,6 +21,9 @@ from app.services.videos import (
     list_video_categories_for_user,
     list_videos_for_user,
     mark_video_processing,
+    sync_video_index_for_user,
+    update_note_for_user,
+    update_video_for_user,
     update_video_status,
 )
 
@@ -112,6 +115,35 @@ def get_video_detail(
     return VideoRead.model_validate(video)
 
 
+@router.patch("/{video_id}", response_model=VideoRead, summary="编辑我的视频资料")
+def edit_video(
+    video_id: str,
+    payload: VideoUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoRead:
+    return VideoRead.model_validate(update_video_for_user(db, current_user, video_id, payload))
+
+
+@router.put("/{video_id}/note", response_model=VideoRead, summary="编辑我的 Markdown 笔记")
+def edit_video_note(
+    video_id: str,
+    payload: VideoNoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoRead:
+    return VideoRead.model_validate(update_note_for_user(db, current_user, video_id, payload))
+
+
+@router.post("/{video_id}/sync-index", response_model=VideoRead, summary="重试知识库同步")
+def sync_video_index(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoRead:
+    return VideoRead.model_validate(sync_video_index_for_user(db, current_user, video_id))
+
+
 @router.delete(
     "/{video_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -187,6 +219,8 @@ def analyze_video(
         update_video_status(db, video, VideoStatus.FAILED, "AI 分析失败，请检查模型设置或服务商额度")
         raise
     update_video_status(db, video, VideoStatus.COMPLETED)
+    if video.embedding is not None:
+        sync_video_index_for_user(db, current_user, video_id)
     return VideoAnalyzeResponse(id=video.id, summary=summary)
 
 

@@ -11,7 +11,9 @@ from app.core.i18n import t
 from app.models.summary import Summary
 from app.models.user import User
 from app.models.video import Video, VideoStatus
-from app.schemas.video import VideoCreate
+from app.schemas.video import VideoCreate, VideoNoteUpdate, VideoUpdate
+from app.services.analysis import _persist_markdown_note
+from app.services.rag import index_video
 from app.services.vector_store import vector_store
 
 
@@ -109,7 +111,9 @@ def list_videos_for_user(
         ))
 
     if category:
-        statement = statement.join(Summary, Summary.video_id == Video.id).where(Summary.category == category)
+        statement = statement.outerjoin(Summary, Summary.video_id == Video.id).where(
+            func.coalesce(Video.user_category, Summary.category) == category
+        )
 
     total_statement = select(func.count()).select_from(statement.subquery())
     total = db.scalar(total_statement) or 0
@@ -126,13 +130,75 @@ def list_videos_for_user(
 
 
 def list_video_categories_for_user(db: Session, user: User) -> list[str]:
+    effective_category = func.coalesce(Video.user_category, Summary.category)
     return list(db.scalars(
-        select(Summary.category)
-        .join(Video, Summary.video_id == Video.id)
-        .where(Video.user_id == user.id, Summary.category.is_not(None), Summary.category != "")
+        select(effective_category)
+        .select_from(Video)
+        .outerjoin(Summary, Summary.video_id == Video.id)
+        .where(Video.user_id == user.id, effective_category.is_not(None), effective_category != "")
         .distinct()
-        .order_by(Summary.category)
+        .order_by(effective_category)
     ))
+
+
+def update_video_for_user(db: Session, user: User, video_id: str, payload: VideoUpdate) -> Video:
+    video = get_video_for_user(db, user, video_id)
+    _ensure_editable(video)
+    changes = payload.model_dump(exclude_unset=True)
+    if "title" in changes:
+        video.title = (changes["title"] or "").strip() or None
+    if "description" in changes:
+        video.description = (changes["description"] or "").strip() or None
+    if "tags" in changes:
+        video.tags = [tag.strip() for tag in (changes["tags"] or [])]
+    if "category" in changes:
+        video.user_category = (changes["category"] or "").strip() or None
+    _commit_and_sync(db, video)
+    return video
+
+
+def update_note_for_user(db: Session, user: User, video_id: str, payload: VideoNoteUpdate) -> Video:
+    video = get_video_for_user(db, user, video_id)
+    _ensure_editable(video)
+    if video.summary is None:
+        raise ApiError("请先完成 AI 分析，再编辑笔记", status_code=status.HTTP_409_CONFLICT)
+    video.summary.markdown_note = payload.markdown_note
+    video.summary.note_is_manual = True
+    _persist_markdown_note(video.id, payload.markdown_note)
+    _commit_and_sync(db, video)
+    return video
+
+
+def sync_video_index_for_user(db: Session, user: User, video_id: str) -> Video:
+    video = get_video_for_user(db, user, video_id)
+    _ensure_editable(video)
+    if video.embedding is None:
+        raise ApiError("视频尚未写入知识库", status_code=status.HTTP_409_CONFLICT)
+    _sync_index(db, video)
+    return video
+
+
+def _ensure_editable(video: Video) -> None:
+    if video.status in ACTIVE_VIDEO_STATUSES:
+        raise ApiError(t("video_already_processing"), status_code=status.HTTP_409_CONFLICT)
+
+
+def _commit_and_sync(db: Session, video: Video) -> None:
+    if video.embedding is not None:
+        video.index_sync_error = "知识库内容待同步"
+    db.commit()
+    if video.embedding is not None:
+        _sync_index(db, video)
+
+
+def _sync_index(db: Session, video: Video) -> None:
+    try:
+        index_video(db, video)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Index sync failed for video {}: {}", video.id, type(exc).__name__)
+        video.index_sync_error = "知识库同步失败，请重试"
+        db.commit()
 
 
 def get_video_for_user(db: Session, user: User, video_id: str) -> Video:

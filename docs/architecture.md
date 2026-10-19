@@ -1,6 +1,6 @@
 # VideoMind AI 当前技术架构
 
-> 核对日期：2026-10-19。描述仓库中的实现与已知边界；不把规划功能写成已完成。
+> 核对日期：2026-10-20。描述仓库中的实现与已知边界；不把规划功能写成已完成。
 
 ## 系统总览
 
@@ -17,6 +17,8 @@ FastAPI /api/v1
 ```
 
 本地开发由 `docker-compose.yml` 默认编排 PostgreSQL、Adminer、后端和前端；Chroma 默认嵌入后端，可选独立服务。前端使用 Next.js 16.3.3、React 19、TypeScript、Tailwind；后端使用 Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。前端容器访问后端可用 `INTERNAL_API_BASE_URL`，浏览器使用 `NEXT_PUBLIC_API_BASE_URL`。
+
+资料编辑使用 `Video.user_category` 覆盖 AI 分类，`Summary.note_is_manual` 标记手工笔记；再次 AI 分析保留手工内容。已入库资料更新时先提交 PostgreSQL 并标记 `index_sync_error`，再更新 Chroma；失败保留旧向量并提供重试。跨存储不具原子性，运行中的单视频编辑会被拒绝。
 
 ## 业务流程与状态
 
