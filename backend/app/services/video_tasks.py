@@ -154,33 +154,38 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         return
     video = task.video
     try:
-        if _cancel_at_checkpoint(db, task):
+        if _stop_at_checkpoint(db, task, worker_id):
             return
         needs_transcript = video.transcript is None or not video.transcript.content.strip()
         if task.kind in ("process", "run") and (needs_transcript or (task.kind == "process" and task.attempts == 1)):
-            _set_stage(db, task, "transcription")
+            if not _set_stage(db, task, worker_id, "transcription"):
+                return
             update_video_status(db, video, VideoStatus.TRANSCRIBING if video.source == "upload" else VideoStatus.DOWNLOADING)
             process_video(db, video, final_status=VideoStatus.ANALYZING if task.kind == "run" else VideoStatus.COMPLETED)
-        if _cancel_at_checkpoint(db, task):
+        if _stop_at_checkpoint(db, task, worker_id):
             return
         if task.kind in ("run", "analyze"):
             if task.kind == "analyze" or video.summary is None:
-                _set_stage(db, task, "analysis")
+                if not _set_stage(db, task, worker_id, "analysis"):
+                    return
                 update_video_status(db, video, VideoStatus.ANALYZING)
                 analyze_video(db, video)
-            if _cancel_at_checkpoint(db, task):
+            if _stop_at_checkpoint(db, task, worker_id):
                 return
         if task.kind in ("run", "embed"):
-            _set_stage(db, task, "embedding")
+            if not _set_stage(db, task, worker_id, "embedding"):
+                return
             update_video_status(db, video, VideoStatus.EMBEDDING)
             index_video(db, video)
         elif task.kind == "analyze" and video.embedding is not None:
-            _set_stage(db, task, "embedding")
+            if not _set_stage(db, task, worker_id, "embedding"):
+                return
             update_video_status(db, video, VideoStatus.EMBEDDING)
             index_video(db, video)
-        if _cancel_at_checkpoint(db, task):
+        if _stop_at_checkpoint(db, task, worker_id, lock=True):
             return
-        update_video_status(db, video, VideoStatus.COMPLETED)
+        video.status = VideoStatus.COMPLETED.value
+        video.processing_error = None
         task.status = "succeeded"
         task.stage = "completed"
         task.finished_at = datetime.now(UTC)
@@ -191,6 +196,10 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         logger.error("Video task {} failed at {}: {}", task_id, task.stage, type(exc).__name__)
         task = db.get(VideoTask, task_id)
         if task is None:
+            return
+        db.refresh(task, with_for_update=True)
+        if task.status != "running" or task.worker_id != worker_id:
+            db.rollback()
             return
         task.status = "failed"
         task.error = exc.message if isinstance(exc, ApiError) else task.video.processing_error or {
@@ -206,13 +215,34 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         db.commit()
 
 
-def _set_stage(db: Session, task: VideoTask, stage: str) -> None:
-    task.stage = stage
+def _set_stage(db: Session, task: VideoTask, worker_id: str, stage: str) -> bool:
+    result = db.execute(
+        update(VideoTask)
+        .where(
+            VideoTask.id == task.id,
+            VideoTask.status == "running",
+            VideoTask.worker_id == worker_id,
+            VideoTask.lease_expires_at >= datetime.now(UTC),
+        )
+        .values(stage=stage)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        return False
     db.commit()
-
-
-def _cancel_at_checkpoint(db: Session, task: VideoTask) -> bool:
     db.refresh(task)
+    return True
+
+
+def _stop_at_checkpoint(db: Session, task: VideoTask, worker_id: str, *, lock: bool = False) -> bool:
+    db.refresh(task, with_for_update=lock)
+    lease_expiry = task.lease_expires_at
+    if lease_expiry is not None and lease_expiry.tzinfo is None:
+        lease_expiry = lease_expiry.replace(tzinfo=UTC)
+    if task.status != "running" or task.worker_id != worker_id or lease_expiry is None or lease_expiry < datetime.now(UTC):
+        db.rollback()
+        return True
     if task.cancel_requested_at is None:
         return False
     task.status = "cancelled"

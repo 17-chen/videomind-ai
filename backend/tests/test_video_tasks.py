@@ -158,3 +158,38 @@ def test_running_cancel_stops_before_next_stage(task_api, monkeypatch):
     with Session(engine) as db:
         assert db.get(VideoTask, task_id).status == "cancelled"
         assert db.get(Video, video_id).status == "cancelled"
+
+
+@pytest.mark.parametrize("raise_after_takeover", [False, True])
+def test_old_worker_cannot_advance_or_fail_reclaimed_task(task_api, monkeypatch, raise_after_takeover):
+    client, engine = task_api
+    video_id = create_video(client)
+    with Session(engine) as db:
+        video = db.get(Video, video_id)
+        task_id = video_tasks.enqueue_video_task(db, video.user, video, "run").id
+        video_tasks.claim_next_task(db, "worker-a")
+
+    called = []
+
+    def interrupted_process(db, video, final_status):
+        with Session(engine) as other:
+            task = other.get(VideoTask, task_id)
+            task.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+            other.commit()
+            assert video_tasks.recover_expired_tasks(other) == 1
+            assert video_tasks.claim_next_task(other, "worker-b").id == task_id
+        if raise_after_takeover:
+            raise RuntimeError("old worker stage failed after lease takeover")
+
+    monkeypatch.setattr(video_tasks, "process_video", interrupted_process)
+    monkeypatch.setattr(video_tasks, "analyze_video", lambda *args: called.append("analysis"))
+    monkeypatch.setattr(video_tasks, "index_video", lambda *args: called.append("embedding"))
+    with Session(engine) as db:
+        video_tasks.execute_claimed_task(db, task_id, "worker-a")
+
+    assert called == []
+    with Session(engine) as db:
+        task = db.get(VideoTask, task_id)
+        assert task.status == "running"
+        assert task.worker_id == "worker-b"
+        assert task.error is None
