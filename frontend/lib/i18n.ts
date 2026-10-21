@@ -1,6 +1,18 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "已取消": ["已取消", "Cancelled"],
+  "任务阶段": ["任务阶段", "Task stage"],
+  "尝试次数": ["尝试次数", "Attempts"],
+  "取消任务": ["取消任务", "Cancel task"],
+  "取消中": ["取消中", "Cancelling"],
+  "任务已取消": ["任务已取消", "Task cancelled"],
+  "取消已请求，当前阶段结束后停止": ["取消已请求，当前阶段结束后停止", "Cancellation requested. Processing stops after the current stage."],
+  "queued": ["排队中", "Queued"],
+  "starting": ["准备中", "Starting"],
+  "transcription": ["转写中", "Transcribing"],
+  "analysis": ["分析中", "Analyzing"],
+  "embedding": ["入库中", "Indexing"],
   "编辑 Markdown 笔记": ["编辑 Markdown 笔记", "Edit Markdown notes"],
   "保存后成为手工笔记；再次运行 AI 分析会更新摘要，但保留手工笔记。": ["保存后成为手工笔记；再次运行 AI 分析会更新摘要，但保留手工笔记。", "Saved notes become manual notes. AI analysis can update the summary but keeps your manual notes."],
   "保存笔记": ["保存笔记", "Save notes"],

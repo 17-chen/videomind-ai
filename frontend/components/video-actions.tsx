@@ -6,25 +6,30 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Bot, Database, Loader2, Trash2, WandSparkles } from "lucide-react";
 import { Button, SecondaryButton } from "@/components/ui";
-import { analyzeVideo, deleteVideo, embedVideo, processVideo, runVideo } from "@/lib/api";
-import type { Video } from "@/lib/types";
+import { analyzeVideo, cancelVideoTask, deleteVideo, embedVideo, getVideoTask, processVideo, runVideo } from "@/lib/api";
+import type { Video, VideoTask } from "@/lib/types";
 import { videoStageLabel } from "@/lib/utils";
 
 type ActionVideo = Pick<Video, "id" | "status" | "transcript" | "summary" | "processing_error">;
-const activeStatuses = new Set(["processing", "downloading", "transcribing", "analyzing", "embedding"]);
+const activeStatuses = new Set(["queued", "processing", "downloading", "transcribing", "analyzing", "embedding"]);
 
 export function VideoActions({ video }: { video: ActionVideo }) {
   const tx = useTranslator();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
+  const [task, setTask] = useState<VideoTask | null>(null);
   const active = activeStatuses.has(video.status);
 
   useEffect(() => {
+    getVideoTask(video.id).then(setTask).catch(() => undefined);
     if (!active) return;
-    const timer = window.setInterval(() => router.refresh(), 5000);
+    const timer = window.setInterval(() => {
+      getVideoTask(video.id).then(setTask).catch(() => undefined);
+      router.refresh();
+    }, 5000);
     return () => window.clearInterval(timer);
-  }, [active, router]);
+  }, [active, router, video.id]);
 
   async function run(action: "all" | "process" | "analyze" | "embed") {
     setLoading(action);
@@ -55,10 +60,26 @@ export function VideoActions({ video }: { video: ActionVideo }) {
     }
   }
 
+  async function cancel() {
+    setLoading("cancel");
+    setMessage("");
+    try {
+      const result = await cancelVideoTask(video.id);
+      setTask(result);
+      setMessage(result.status === "cancelled" ? tx("任务已取消") : tx("取消已请求，当前阶段结束后停止"));
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : tx("操作失败"));
+    } finally {
+      setLoading(null);
+    }
+  }
+
   const busy = loading !== null || active;
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{tx("当前状态：")}<span className="font-semibold text-foreground">{tx(videoStageLabel(video))}</span></p>
+      {task ? <p className="text-xs text-muted-foreground">{tx("任务阶段")}：{tx(task.stage)} · {tx("尝试次数")}：{task.attempts}</p> : null}
       <div className="grid gap-2">
         <Button type="button" onClick={() => run("all")} disabled={busy}>
           {loading === "all" || active ? <Loader2 className="animate-spin" size={16} /> : <WandSparkles size={16} />}
@@ -81,6 +102,12 @@ export function VideoActions({ video }: { video: ActionVideo }) {
           {tx("写入知识库")}
         </SecondaryButton>
       </div>
+      {active && task && (task.status === "queued" || task.status === "running") ? (
+        <SecondaryButton type="button" onClick={cancel} disabled={loading !== null || Boolean(task.cancel_requested_at)} className="w-full">
+          {task.cancel_requested_at ? tx("取消中") : tx("取消任务")}
+        </SecondaryButton>
+      ) : null}
+      {task?.error ? <p className="text-xs text-destructive">{task.error}</p> : null}
       <SecondaryButton type="button" onClick={remove} disabled={busy} className="w-full border-destructive/30 text-destructive hover:border-destructive">
         {loading === "delete" ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
         {tx("删除视频")}

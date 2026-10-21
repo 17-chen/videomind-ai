@@ -1,6 +1,6 @@
 # VideoMind AI 当前技术架构
 
-> 核对日期：2026-10-20。描述仓库中的实现与已知边界；不把规划功能写成已完成。
+> 核对日期：2026-10-21。描述仓库中的实现与已知边界；不把规划功能写成已完成。
 
 ## 系统总览
 
@@ -9,26 +9,27 @@
     │  HTTP + 可选 Supabase access token
     ▼
 FastAPI /api/v1
-    ├─ PostgreSQL：用户、视频、转写、摘要、向量 ID 映射
+    ├─ PostgreSQL：用户、视频、转写、摘要、任务、向量 ID 映射
+    ├─ 独立 Worker：领取持久任务、维护租约、按阶段执行
     ├─ 本地文件：视频、音频、Markdown 笔记
     ├─ yt-dlp + ffmpeg：下载和音频提取
     ├─ DeepSeek：视频分析与问答生成
     └─ ChromaDB + local_hash（默认）或 bge_zh（可选）：当前 RAG 检索
 ```
 
-本地开发由 `docker-compose.yml` 默认编排 PostgreSQL、Adminer、后端和前端；Chroma 默认嵌入后端，可选独立服务。前端使用 Next.js 16.3.3、React 19、TypeScript、Tailwind；后端使用 Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。前端容器访问后端可用 `INTERNAL_API_BASE_URL`，浏览器使用 `NEXT_PUBLIC_API_BASE_URL`。
+本地开发由 `docker-compose.yml` 编排 PostgreSQL、Adminer、后端、前端和 Worker；Chroma 默认嵌入后端，可选独立服务。前端使用 Next.js 16.3.3、React 19、TypeScript、Tailwind；后端使用 Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。前端容器访问后端可用 `INTERNAL_API_BASE_URL`，浏览器使用 `NEXT_PUBLIC_API_BASE_URL`。
 
 资料编辑使用 `Video.user_category` 覆盖 AI 分类，`Summary.note_is_manual` 标记手工笔记；再次 AI 分析保留手工内容。已入库资料更新时先提交 PostgreSQL 并标记 `index_sync_error`，再更新 Chroma；失败保留旧向量并提供重试。跨存储不具原子性，运行中的单视频编辑会被拒绝。
 
 ## 业务流程与状态
 
 1. 前端提交 Bilibili/抖音 URL 或分享文本，或上传本地视频；后端创建归属于当前用户的 Video 记录。上传使用服务端 ID 命名、哈希防本人重复及 ffprobe 内容校验。
-2. `POST /videos/{id}/process` 启动 BackgroundTask：URL 视频由 yt-dlp 下载并优先解析字幕；本地上传直接读取本人已保存文件。没有字幕时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
+2. `POST /videos/{id}/process` 创建持久任务，由 Worker 执行：URL 视频由 yt-dlp 下载并优先解析字幕；本地上传直接读取本人已保存文件。没有字幕时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
 3. `POST /videos/{id}/analyze` 使用 LangGraph Video Analysis Agent 和 DeepSeek，生成结构化 Summary 与 Markdown 笔记。
 4. `POST /videos/{id}/embed` 拼接视频、转写和摘要文本，默认用 local_hash 生成向量；可选 bge_zh 对长文档分段。向量写入 Chroma，PostgreSQL 保存视频级向量 ID。
 5. `POST /chat` 按 user_id 检索 Chroma 结果，再调用 DeepSeek 生成中文回答并返回视频来源。
 
-视频详情现在也可调用 `POST /videos/{id}/run`，由单个 BackgroundTask 依次执行上述三步；重复启动通过数据库状态原子校验拒绝，失败后重试复用已保存的转写与笔记。这个任务不具备跨进程或重启后的恢复能力。状态枚举包括 created、queued、processing、downloading、transcribing、analyzing、embedding、completed、failed；“有状态字段”不等于每个阶段均经真实视频验证。
+视频详情可调用 `POST /videos/{id}/run` 创建完整任务；分步处理、分析、入库也走同一队列。`VideoTask` 记录归属、阶段、尝试次数、租约和取消请求。多个 Worker 通过 PostgreSQL `FOR UPDATE SKIP LOCKED` 竞争领取，Worker 失联后由租约恢复；可能已经计费且未落库的分析/云端转写不会自动重试。取消在阶段边界检查，不能中断进行中的外部调用。状态枚举还包括 cancelled；真实付费服务与多实例长期运行仍待验收。
 
 视频删除使用 `DELETE /videos/{id}`：先锁定本人且非处理中的记录，以视频 ID 和 user_id 清理 Chroma，随后删除数据库记录与关联内容，最后清理本地生成文件。向量库不可用时会保留数据库记录；跨存储尚无原子事务，数据库失败后可重新索引。
 
@@ -41,7 +42,7 @@ FastAPI /api/v1
 | HTTP API | `backend/app/api/v1/routes/` | 视频、聊天和健康检查 |
 | 视频处理 | `backend/app/services/video_processing/` | 下载、字幕解析、音频提取、转写、状态更新 |
 | AI 与检索 | `backend/app/agents/`、`backend/app/services/{analysis,rag,embeddings,vector_store}.py` | 分析、笔记、向量化和问答 |
-| 持久化 | `backend/app/models/`、`backend/alembic/` | User、Video、Transcript、Summary、Embedding 模型与迁移 |
+| 持久化 | `backend/app/models/`、`backend/alembic/` | VideoTask、其他业务模型、迁移和独立 Worker |
 
 User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一对一。视频列表和详情按当前用户查询；Chroma 查询也带 user_id 过滤。真实多用户隔离尚需双用户运行测试。
 
@@ -56,9 +57,9 @@ User 与 Video 是一对多；Video 与 Transcript、Summary、Embedding 是一�
 - `ASR_PROVIDER=disabled` 为默认值；可选 faster-whisper 本地转写已有接入，或使用当前用户的 OpenAI 转写密钥。真实音频与外部调用尚未验收。
 - `local_hash` 仅是确定性向量方案，用于流程验证；中文语义检索效果待更合适的模型验证。
 - 可选 `bge_zh` 使用单独集合和分段向量；切换模型后需要运行重新入库脚本，真实中文检索质量仍待评测。
-- BackgroundTasks 不提供跨重启持久化、可靠重试或队列隔离；本地单进程重启会把中断记录标为失败供用户手动重试，生产队列仍待改造。
+- PostgreSQL 任务队列已提供跨 API 重启持久化和独立 Worker；真实 Worker 强制中断、长任务心跳、生产多实例和付费步骤恢复仍待完整演练。
 - 本地 `storage/` 不等于云端持久对象存储；Chroma 生产持久化/pgvector 迁移未完成。
-- 本地上传入口已有实现和自生成视频的上传/删除烟测；上传到真实 ASR、笔记、入库仍待实际服务验收。笔记编辑、自动分类修改仍未实现。
+- 本地上传和资料编辑已有实现；上传到真实 ASR、笔记、入库仍待实际服务验收。
 - 视频下载依赖平台规则、网络、Cookie 和 yt-dlp 版本；必须用真实 URL 验证。
 
 ## 下一步技术演进

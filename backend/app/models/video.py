@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.summary import Summary
     from app.models.transcript import Transcript
     from app.models.user import User
+    from app.models.video_task import VideoTask
 
 
 class VideoStatus(StrEnum):
@@ -25,6 +26,7 @@ class VideoStatus(StrEnum):
     EMBEDDING = "embedding"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Video(IdMixin, TimestampMixin, Base):
@@ -52,3 +54,4 @@ class Video(IdMixin, TimestampMixin, Base):
     transcript: Mapped["Transcript | None"] = relationship(back_populates="video", cascade="all, delete-orphan", uselist=False)
     summary: Mapped["Summary | None"] = relationship(back_populates="video", cascade="all, delete-orphan", uselist=False)
     embedding: Mapped["Embedding | None"] = relationship(back_populates="video", cascade="all, delete-orphan", uselist=False)
+    tasks: Mapped[list["VideoTask"]] = relationship(back_populates="video", cascade="all, delete-orphan")

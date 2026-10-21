@@ -27,7 +27,8 @@ export function statusLabel(status: string) {
     analyzing: "AI 分析中",
     embedding: "写入知识库中",
     completed: "已完成",
-    failed: "失败"
+    failed: "失败",
+    cancelled: "已取消"
   };
   return map[status] ?? status;
 }

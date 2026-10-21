@@ -13,7 +13,8 @@ from app.core.config import settings
 from app.database.base import Base
 from app.main import app
 from app.models import AiSettings, Embedding, Summary, Transcript, User, Video  # noqa: F401
-from app.services import ai_provider, rag, video_workflow
+from app.services import ai_provider, rag
+from app.services.video_tasks import claim_next_task, execute_claimed_task
 from app.services.auth import AuthIdentity
 from app.services.video_processing import pipeline
 from app.services.video_processing.types import DownloadedVideo, SubtitleResult
@@ -28,7 +29,6 @@ def test_own_key_video_to_private_chat(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "deepseek_api_key", "owner-key-must-not-be-used")
     monkeypatch.setattr(settings, "note_storage_dir", str(tmp_path / "notes"))
     monkeypatch.setattr(dependencies, "decode_supabase_token", lambda token: AuthIdentity(subject=token, email=f"{token}@example.com"))
-    monkeypatch.setattr(video_workflow, "SessionLocal", lambda: Session(engine))
 
     def db_session():
         with Session(engine) as db:
@@ -94,6 +94,12 @@ def test_own_key_video_to_private_chat(monkeypatch, tmp_path):
             video_id = created.json()["id"]
             started = client.post(f"/api/v1/videos/{video_id}/run", headers=auth("alice"))
             assert started.status_code == 202
+            assert started.json()["status"] == "queued"
+            with Session(engine) as db:
+                task = claim_next_task(db, "test-worker")
+                assert task.id == started.json()["task_id"]
+                execute_claimed_task(db, task.id, "test-worker")
+                execute_claimed_task(db, task.id, "test-worker")  # Re-delivery must not repeat paid steps.
             detail = client.get(f"/api/v1/videos/{video_id}", headers=auth("alice"))
             assert detail.status_code == 200
             assert detail.json()["status"] == "completed"

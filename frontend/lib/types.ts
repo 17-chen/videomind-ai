@@ -71,6 +71,20 @@ export type VideoListResponse = {
   offset: number;
 };
 
+export type VideoTask = {
+  id: string;
+  video_id: string;
+  kind: "process" | "run" | "analyze" | "embed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  stage: string;
+  attempts: number;
+  error: string | null;
+  cancel_requested_at: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
 export type ChatSource = {
   video_id: string;
   title: string;

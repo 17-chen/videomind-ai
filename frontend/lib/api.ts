@@ -1,4 +1,4 @@
-import type { AiSettings, AiSettingsWrite, ChatResponse, Video, VideoListResponse } from "@/lib/types";
+import type { AiSettings, AiSettingsWrite, ChatResponse, Video, VideoListResponse, VideoTask } from "@/lib/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const BROWSER_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
@@ -71,6 +71,14 @@ export async function getVideo(id: string, accessToken?: string) {
   return request<Video>(`/videos/${id}`, undefined, accessToken);
 }
 
+export async function getVideoTask(id: string) {
+  return request<VideoTask | null>(`/videos/${id}/task`);
+}
+
+export async function cancelVideoTask(id: string) {
+  return request<VideoTask>(`/videos/${id}/task/cancel`, { method: "POST" });
+}
+
 export async function updateVideo(id: string, payload: { title: string; description: string; tags: string[]; category: string }) {
   return request<Video>(`/videos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
@@ -120,13 +128,13 @@ export async function processVideo(id: string) {
 }
 
 export async function analyzeVideo(id: string) {
-  return request<{ id: string; summary: Video["summary"] }>(`/videos/${id}/analyze`, {
+  return request<{ id: string; status: string; message: string; task_id: string }>(`/videos/${id}/analyze`, {
     method: "POST"
   });
 }
 
 export async function embedVideo(id: string) {
-  return request<{ id: string; vector_id: string; message: string }>(`/videos/${id}/embed`, {
+  return request<{ id: string; status: string; message: string; task_id: string }>(`/videos/${id}/embed`, {
     method: "POST"
   });
 }

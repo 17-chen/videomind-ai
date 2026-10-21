@@ -80,7 +80,7 @@ http://localhost:8000/docs
 
 ### `POST /api/v1/videos/{id}/process`
 
-触发视频处理 Pipeline。
+返回 202 并创建 PostgreSQL 持久任务，由独立 Worker 执行视频处理 Pipeline。`POST /run`、`POST /analyze`、`POST /embed` 也返回 202；它们不再在 API 请求里执行耗时步骤。
 
 当前 Pipeline：
 
@@ -98,14 +98,15 @@ Video URL → yt-dlp 下载视频与字幕 → 优先解析字幕
 ```json
 {
   "id": "video_id",
-  "status": "downloading",
-  "message": "视频处理任务已启动"
+  "status": "queued",
+  "message": "视频处理任务已启动",
+  "task_id": "task_uuid"
 }
 ```
 
 ### `POST /api/v1/videos/{id}/analyze`
 
-启动 Phase 4 的 Video Analysis Agent。
+将 Phase 4 的 Video Analysis Agent 入队；须已有 transcript 和本人模型配置。
 
 输入来源：
 
@@ -125,7 +126,7 @@ Transcript
 
 ### `POST /api/v1/videos/{id}/embed`
 
-将视频写入 ChromaDB 向量知识库。
+将视频入库任务排队，由 Worker 写入 ChromaDB 向量知识库。
 
 输入来源：
 
@@ -145,15 +146,11 @@ Video metadata
 - 当前默认 `EMBEDDING_PROVIDER=local_hash`，不依赖 OpenAI。
 - 可选 `bge_zh` 使用独立集合与分段索引；真实模型效果尚未验收。
 
-响应：
+响应为 202，包含 `id`、`status=queued`、`message` 和 `task_id`。完成后从视频详情或任务接口查询结果。
 
-```json
-{
-  "id": "video_id",
-  "vector_id": "video:video_id",
-  "message": "视频已写入向量知识库"
-}
-```
+### `GET /api/v1/videos/{id}/task`、`POST /api/v1/videos/{id}/task/cancel`
+
+前者返回本人视频的最近任务，包含 `kind`、`status`、`stage`、`attempts`、`error` 和时间；无任务返回 `null`。后者取消本人排队任务，或对运行中任务设置取消请求；Worker 在当前阶段结束后停止后续阶段。其他用户返回 404。失联任务经租约恢复；可能产生费用的阶段如未确认落库，会停止自动重试并要求人工发起新任务。
 
 ### `POST /api/v1/chat`
 

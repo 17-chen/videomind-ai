@@ -2,6 +2,8 @@
 
 ## 进行中
 
+- [ ] R5 持久化视频任务：PostgreSQL 队列、Worker、取消与 API 重启/并发烟测已实现；仍需真实 Worker 强制中断、长任务心跳和付费阶段验收。
+
 - [ ] Sprint 02 用户系统（验收标准：Supabase 注册、登录、退出、Profile、后端 JWT 验证和用户数据隔离）
 - [ ] R3 本地上传真实完整链路验收：入口、校验、用户隔离及文件清理已实现；需在可用 ASR 与本人模型配置下确认真实转写、笔记和入库。
 
@@ -22,7 +24,7 @@
 - [ ] FastAPI Supabase Auth 令牌验证与用户同步（优先级：高；阶段：Sprint 02；代码已补，真实项目验收待做）
 - [ ] Supabase PostgreSQL / Storage / pgvector（优先级：高；阶段：Sprint 03）
 - [ ] Vercel 前端与 Render 后端部署（优先级：高；阶段：Sprint 07）
-- [ ] 视频处理任务队列方案（优先级：中；依赖：后端部署平台）
+- [x] 本地视频任务队列方案（2026-10-21；PostgreSQL + 独立 Worker 已实现；正式平台与长期运行仍待验收）
 - [ ] 线上 Debug 文档与测试 Checklist（优先级：中；依赖：部署方案确认）
 
 ## 已完成

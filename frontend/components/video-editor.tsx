@@ -7,7 +7,7 @@ import { updateVideo, updateVideoNote, syncVideoIndex } from "@/lib/api";
 import type { Video } from "@/lib/types";
 import { Button, Input, SecondaryButton, Textarea } from "@/components/ui";
 
-const activeStatuses = new Set(["processing", "downloading", "transcribing", "analyzing", "embedding"]);
+const activeStatuses = new Set(["queued", "processing", "downloading", "transcribing", "analyzing", "embedding"]);
 
 export function VideoEditor({ video, mode }: { video: Video; mode: "metadata" | "note" }) {
   const router = useRouter();

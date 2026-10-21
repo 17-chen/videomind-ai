@@ -11,6 +11,7 @@ from app.core.i18n import t
 from app.models.summary import Summary
 from app.models.user import User
 from app.models.video import Video, VideoStatus
+from app.models.video_task import VideoTask
 from app.schemas.video import VideoCreate, VideoNoteUpdate, VideoUpdate
 from app.services.analysis import _persist_markdown_note
 from app.services.rag import index_video
@@ -34,6 +35,7 @@ def create_video(db: Session, user: User, payload: VideoCreate) -> Video:
 
 
 ACTIVE_VIDEO_STATUSES = (
+    VideoStatus.QUEUED.value,
     VideoStatus.PROCESSING.value,
     VideoStatus.DOWNLOADING.value,
     VideoStatus.TRANSCRIBING.value,
@@ -79,7 +81,7 @@ def recover_interrupted_videos(db: Session) -> int:
     """Release tasks abandoned by a stopped single-process local server."""
     result = db.execute(
         update(Video)
-        .where(Video.status.in_(ACTIVE_VIDEO_STATUSES))
+        .where(Video.status.in_(ACTIVE_VIDEO_STATUSES), ~Video.tasks.any(VideoTask.status.in_(("queued", "running"))))
         .values(
             status=VideoStatus.FAILED.value,
             processing_error="服务重启中断了处理，请点击重试",

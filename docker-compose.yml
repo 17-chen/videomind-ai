@@ -88,6 +88,22 @@ services:
     depends_on:
       - backend
 
+  worker:
+    image: videomind-ai-backend
+    container_name: videomind-worker
+    profiles: ["app"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+      - ./storage/model-cache:/root/.cache/huggingface
+    command: sh -c "python -m scripts.migrate && python -m scripts.video_worker"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   chroma_data:

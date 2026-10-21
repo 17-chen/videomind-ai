@@ -1,6 +1,6 @@
 # VideoMind AI 完整交接文档
 
-> 更新：2026-10-20。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
+> 更新：2026-10-21。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
 
 ## 1. 先读摘要
 
@@ -8,13 +8,13 @@
 
 - **真实仓库：**`/Users/chenxin/Documents/Codex 2/videomind-ai`。
 - **GitHub：**`https://github.com/17-chen/videomind-ai`；remote 为 `git@github.com:17-chen/videomind-ai.git`，主分支 `main`。
-- **最近功能基线：**2026-10-20 新增 R4 资料编辑和 `20261020_0006` 迁移；恢复时以实际 Git 为准。
-- **本轮开工前：**工作树干净；发现远端领先一个字幕修复提交，已快进合入。完成时再次核对实际 Git 状态。
-- **最新后端证据：**2026-10-19，66 项测试与 Ruff 通过；自生成视频的本地 API 上传/删除烟测通过。
-- **最新前端证据：**2026-10-19，临时副本的 typecheck、lint、生产构建通过；工作台预览显示上传入口。
-- **自动检查：**2026-10-18 已在 [GitHub Actions](https://github.com/17-chen/videomind-ai/actions/runs/39103657908) 验证后端、前端任务通过；R9 仅自动检查子项完成。
-- **下一步：**优先完成 R1 真实本地模型与音频/检索对照；R3 上传真实 ASR→笔记→入库验收仍待模型可用，R4 编辑可独立开发。
-- **没有遗留的半成品实现：**本轮检索工具已提交并有报告；真实模型效果未验收是后续工作，不是工具测试失败。
+- **最近功能基线：**2026-10-21 增加 PostgreSQL 视频任务、独立 Worker 和 `20261021_0007` 迁移；恢复时以实际 Git 为准。
+- **2026-10-21 开工前：**工作树干净，本地 `main` 与 `origin/main` 一致；完成时再次核对实际 Git 状态。
+- **最新后端证据：**2026-10-21，73 项测试与 Ruff 通过；持久任务本机 API/Worker/并发烟测通过。
+- **最新前端证据：**2026-10-21，临时副本的 typecheck、lint、生产构建通过；任务阶段和取消入口已接入。
+- **自动检查：**2026-10-20 的 [GitHub Actions](https://github.com/17-chen/videomind-ai/actions/runs/39283675785) 后端、前端任务均通过；R9 仅自动检查子项完成。
+- **下一步：**R5 继续真实 Worker 中断和长任务心跳验收；R1/R3 的真实模型与音频验收仍待完成。
+- **本轮未完成的验收：**R5 真实 Worker 强制中断和长任务心跳、R1 本地模型质量以及真实 Supabase/服务商调用仍待验证；不能由模拟测试推断通过。
 
 先读本文件，再读 [剩余工作](docs/COMPLETION_PLAN.md)、[项目上下文](PROJECT_CONTEXT.md)、[TODO](TODO.md)。详细索引见 [项目资料](docs/PROJECT_MATERIALS.md)；新聊天开场文字见 [恢复说明](docs/NEW_CHAT_START.md)。
 
@@ -40,7 +40,7 @@
 | 认证 | 默认 demo；可选 Supabase Auth 校验与用户映射 | `frontend/lib/supabase/`、`backend/app/{api/dependencies,services/auth}.py` |
 | API | FastAPI /api/v1，SQLAlchemy 数据访问 | `backend/app/api/v1/routes/`、`backend/app/main.py` |
 | 视频处理 | yt-dlp、字幕优先、ffmpeg 提取音频、可选 ASR | `backend/app/services/video_processing/` |
-| 一键流程 | 转写 → 分析 → 向量写入，失败复用已有阶段 | `backend/app/services/video_workflow.py` |
+| 持久任务 | PostgreSQL 入队 → 独立 Worker 分阶段执行与取消 | `backend/app/services/video_tasks.py`、`backend/scripts/video_worker.py` |
 | 分析 | LangGraph 生成结构化摘要和 Markdown | `backend/app/agents/video_analysis_agent.py`、`backend/app/services/analysis.py` |
 | 个人 Key | 按用户保存，加密存储，不回传明文 | `backend/app/services/ai_settings.py`、`backend/app/models/ai_settings.py` |
 | RAG | hash 默认、BGE 可选，Chroma 检索后生成回答 | `backend/app/services/{rag,embeddings,vector_store}.py` |
@@ -48,7 +48,7 @@
 | 本地文件 | 媒体、音频、转写、笔记和模型缓存 | `storage/`，不随 Git 提交 |
 | 运维脚本 | 迁移、向量重建、固定检索评测 | `backend/scripts/` |
 
-已接受的方向：本地优先，后续 Vercel + Render + Supabase；向量生产适配拟采用 pgvector。Redis/Celery 是队列候选，不是现有实现。长期决定见 [DECISION_LOG](DECISION_LOG.md)。
+已接受的方向：本地优先，后续 Vercel + Render + Supabase；向量生产适配拟采用 pgvector。当前本地任务使用 PostgreSQL 队列，Redis/Celery 是后续部署负载明确后的候选。长期决定见 [DECISION_LOG](DECISION_LOG.md)。
 
 ## 4. 已有功能与验收边界
 
@@ -66,7 +66,7 @@
 | 固定检索评测 | 已完成 | 真实 hash + 内存 Chroma，15 个虚构问题，召回与逐题报告见下节 |
 | 本地上传 | 代码已实现 | 自生成视频的真实本地 HTTP 上传、重复冲突、删除清理及模拟处理链路通过；真实 ASR、本人模型与双用户验收未做 |
 | 资料编辑 | 代码已实现 | 本地 API 编辑/筛选、权限与模拟向量故障通过；真实多用户与模型未验收 |
-| 可靠队列、任务取消 | 未完成 | 详见 R5，不能因为已有状态枚举就当作已实现 |
+| 持久任务、取消 | 本地代码已实现 | API 重启保留任务、独立 Worker、双 Worker 竞争与租约恢复烟测通过；真实 Worker 强制中断和长任务心跳未验收 |
 | 云存储/pgvector、配额监控、正式部署 | 未完成 | 详见 R6、R8、R9 |
 
 ## 5. 关键实现约束
@@ -75,7 +75,7 @@
 - **认证映射：**只按 Supabase subject 映射本地用户；已有邮箱冲突拒绝自动合并，避免接管 demo 或其他账号资料。
 - **加密主密钥：**`USER_API_KEY_ENCRYPTION_KEY` 保存在未提交环境中。不能为排错随意覆盖或重新生成，否则已有加密 Key 无法读取。
 - **用户隔离：**视频查询、分类、处理和删除按 user_id；向量检索也有 user_id 过滤。未来上传、任务和存储接口必须继承同一边界。
-- **任务：**当前为 FastAPI BackgroundTasks，通过数据库状态原子更新防重复启动。重启只会在本地把中断任务标为失败供手动重试，不会自动持久化恢复。
+- **任务：**处理、分析、入库目前使用 PostgreSQL VideoTask 与独立 Worker；同视频活动任务由状态与部分唯一索引保护。失联租约可恢复，分析和可能已计费的云端转写中断要求手动重试。取消在阶段边界生效，不能中断当前外部调用。
 - **安全索引：**BGE 新分段使用内容版本 ID，先写入新版本，再清理旧版本；新写入失败时旧内容可继续检索。清理失败可能短时留两版，由检索按视频去重。
 - **删除顺序：**先删本人向量，再提交数据库删除，再清理本地文件。跨存储不具有原子事务；失败边界见技术决策日志。
 - **模型切换：**hash 与 BGE 使用不同集合；切换模型后要显式重建。重建先 dry-run，实际重建会写向量。
@@ -101,8 +101,8 @@
 - 前端本地预览：`http://localhost:3000`，知识库 `/library`，模型设置 `/settings`。
 - 本机 VideoMind API 使用 `http://localhost:8001`，容器内部后端仍为 8000；此前宿主 8000 被另一项目占用。
 - Docker 实际使用 Colima socket：`unix:///Users/chenxin/.colima/default/docker.sock`。默认 Docker Desktop socket 不存在不代表项目停机。
-- 后端/前端/PostgreSQL 容器分别为 `videomind-backend`、`videomind-frontend`、`videomind-postgres`。
-- 2026-10-20 本机实测 Alembic 版本为 `20261020_0006 (head)`；新环境要核对实际版本并迁移，不盲目 stamp。
+- 后端/前端/PostgreSQL/Worker 容器分别为 `videomind-backend`、`videomind-frontend`、`videomind-postgres`、`videomind-worker`。
+- 2026-10-21 本机实测 Alembic 版本为 `20261021_0007 (head)`；新环境要核对实际版本并迁移，不盲目 stamp。
 - 之前为 demo 认证、embedded Chroma、local_hash、ASR disabled。实际值只在授权环境检查，不把 `.env` 整份输出。
 - `storage/model-cache/` 映射模型缓存；可选依赖默认不安装，首次下载不等于已缓存成功。
 
@@ -119,6 +119,8 @@ curl --max-time 5 http://localhost:8001/api/v1/health/ready
 ```
 
 readiness 应包含 `service=VideoMind AI`；必要时检查 `/openapi.json` 有视频路由，避免测试到另一应用。服务停机时先查日志和挂载，不删除数据库或数据卷。
+
+视频处理现在需要独立 Worker。现有后端镜像可通过 `docker compose --profile app up -d --no-deps worker` 启动 Worker；从零启动时使用 `docker compose --profile app up -d --build`。检查 `docker compose logs --tail=50 worker` 和视频详情里的任务状态。API 接受任务只代表已入队，Worker 未运行时任务会保留 queued。
 
 ### 后端验证
 
@@ -175,14 +177,14 @@ exit
 | `467c61e` | WebVTT 分钟时间戳修复 | 对应字幕测试与 Git diff |
 | `8e03e73` | 可选本地 AI、索引安全更新和任务中断标记 | `docs/VERIFICATION_2026-10-12.md`、`docs/VERIFICATION_2026-10-13.md` |
 
-早期 16/29/41 项测试和“未提交”描述是历史记录，不能覆盖最新事实。本次仅整理文档，不重新运行全部代码测试；最近实测日期如上。
+早期 16/29/41 项测试和“未提交”描述是历史记录，不能覆盖最新事实。2026-10-21 的实现与验证见 [核查记录](docs/VERIFICATION_2026-10-21.md)。
 
 ## 10. 新聊天的第一轮工作
 
 1. 确认是否能访问真实仓库；若只有 ChatGPT 项目镜像，`sources/` 只读，不在那里修改业务代码。
 2. 读仓库 `AGENTS.md`、本文件、剩余计划和当前 Git；先保护任何后来出现的用户改动。
 3. 用简短中文报告当前状态、下一项 R 编号和验收方法，再继续实现。
-4. 优先 R1；缺少账号时继续不依赖账号的工作。公开测试素材与本地模型下载并不一定需要用户提供。
+4. 优先检查 R5 剩余故障演练与 R1 真实本地模型；缺少账号时继续不依赖账号的工作。公开测试素材与本地模型下载并不一定需要用户提供。
 5. 完成后运行适当检查，更新有日期证据和任务状态；若当前用户授权同步，再核对远端、提交和推送，不能 force push。
 6. 不能访问仓库时，使用本文件和剩余计划恢复背景，但明确说明未检查代码，不虚构测试或部署成功。
 

@@ -86,7 +86,7 @@ class VideoRead(BaseModel):
     thumbnail: str | None = Field(title="封面图")
     status: str = Field(
         title="处理状态",
-        description="机器字段，表示 created / downloading / transcribing / analyzing / embedding / completed / failed。",
+        description="机器字段，表示 created / queued / processing / downloading / transcribing / analyzing / embedding / completed / failed / cancelled。",
     )
     source: str | None = Field(title="视频来源", description="例如 bilibili、douyin、youtube、tiktok。")
     tags: list[str] = Field(title="标签")
@@ -104,6 +104,23 @@ class VideoProcessResponse(BaseModel):
     id: str = Field(title="视频 ID")
     status: str = Field(title="处理状态")
     message: str = Field(title="提示消息")
+    task_id: str | None = Field(default=None, title="持久任务 ID")
+
+
+class VideoTaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    video_id: str
+    kind: str
+    status: str
+    stage: str
+    attempts: int
+    error: str | None
+    cancel_requested_at: datetime | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
 
 
 class VideoAnalyzeResponse(BaseModel):

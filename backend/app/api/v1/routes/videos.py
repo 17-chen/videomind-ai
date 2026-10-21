@@ -1,30 +1,24 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
 from app.core.i18n import t
+from app.core.errors import ApiError
 from app.models.user import User
-from app.models.video import VideoStatus
-from app.schemas.rag import VideoEmbedResponse
-from app.schemas.video import VideoAnalyzeResponse, VideoCreate, VideoListResponse, VideoNoteUpdate, VideoProcessResponse, VideoRead, VideoUpdate
+from app.schemas.video import VideoCreate, VideoListResponse, VideoNoteUpdate, VideoProcessResponse, VideoRead, VideoTaskRead, VideoUpdate
 from app.services.ai_settings import resolve_llm
-from app.services.analysis import analyze_video as analyze_video_summary
-from app.services.rag import index_video
-from app.services.video_processing.pipeline import process_video_by_id
+from app.services.rag import build_video_document
+from app.services.video_tasks import cancel_video_task_for_user, enqueue_video_task, latest_video_task_for_user
 from app.services.video_upload import save_uploaded_video, upload_policy
-from app.services.video_workflow import run_video_workflow_by_id
 from app.services.videos import (
-    claim_video_operation,
     create_video,
     delete_video_for_user,
     get_video_for_user,
     list_video_categories_for_user,
     list_videos_for_user,
-    mark_video_processing,
     sync_video_index_for_user,
     update_note_for_user,
     update_video_for_user,
-    update_video_status,
 )
 
 router = APIRouter()
@@ -167,14 +161,12 @@ def delete_video(
 )
 def process_video(
     video_id: str,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    video = mark_video_processing(db=db, video=video)
-    background_tasks.add_task(process_video_by_id, video.id)
-    return VideoProcessResponse(id=video.id, status=video.status, message=t("video_processing_started"))
+    task = enqueue_video_task(db, current_user, video, "process")
+    return VideoProcessResponse(id=video.id, status=video.status, message=t("video_processing_started"), task_id=task.id)
 
 
 @router.post(
@@ -186,21 +178,39 @@ def process_video(
 )
 def run_video(
     video_id: str,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     if video.summary is None:
         resolve_llm(current_user)
-    video = claim_video_operation(db, video, VideoStatus.PROCESSING)
-    background_tasks.add_task(run_video_workflow_by_id, video.id, current_user.id)
-    return VideoProcessResponse(id=video.id, status=video.status, message="已开始完整处理，页面会自动更新进度")
+    task = enqueue_video_task(db, current_user, video, "run")
+    return VideoProcessResponse(id=video.id, status=video.status, message="任务已入队，页面会自动更新进度", task_id=task.id)
+
+
+@router.get("/{video_id}/task", response_model=VideoTaskRead | None, summary="获取最近视频任务")
+def get_video_task(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoTaskRead | None:
+    task = latest_video_task_for_user(db, current_user, video_id)
+    return VideoTaskRead.model_validate(task) if task is not None else None
+
+
+@router.post("/{video_id}/task/cancel", response_model=VideoTaskRead, summary="取消视频任务")
+def cancel_video_task(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> VideoTaskRead:
+    return VideoTaskRead.model_validate(cancel_video_task_for_user(db, current_user, video_id))
 
 
 @router.post(
     "/{video_id}/analyze",
-    response_model=VideoAnalyzeResponse,
+    response_model=VideoProcessResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="启动 AI 分析",
     description="基于视频 transcript 调用 Video Analysis Agent，生成结构化摘要和 Markdown 笔记。",
 )
@@ -208,25 +218,19 @@ def analyze_video(
     video_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> VideoAnalyzeResponse:
+) -> VideoProcessResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
+    if video.transcript is None or not video.transcript.content.strip():
+        raise ApiError(t("transcript_required"), status.HTTP_400_BAD_REQUEST)
     resolve_llm(current_user)
-    claim_video_operation(db, video, VideoStatus.ANALYZING)
-    try:
-        summary = analyze_video_summary(db=db, video=video)
-    except Exception:
-        db.rollback()
-        update_video_status(db, video, VideoStatus.FAILED, "AI 分析失败，请检查模型设置或服务商额度")
-        raise
-    update_video_status(db, video, VideoStatus.COMPLETED)
-    if video.embedding is not None:
-        sync_video_index_for_user(db, current_user, video_id)
-    return VideoAnalyzeResponse(id=video.id, summary=summary)
+    task = enqueue_video_task(db, current_user, video, "analyze")
+    return VideoProcessResponse(id=video.id, status=video.status, message="AI 分析任务已入队", task_id=task.id)
 
 
 @router.post(
     "/{video_id}/embed",
-    response_model=VideoEmbedResponse,
+    response_model=VideoProcessResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="写入向量知识库",
     description="将视频 transcript、AI 摘要和 Markdown 笔记写入 ChromaDB，用于后续 RAG 问答。",
 )
@@ -234,14 +238,9 @@ def embed_video(
     video_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> VideoEmbedResponse:
+) -> VideoProcessResponse:
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
-    claim_video_operation(db, video, VideoStatus.EMBEDDING)
-    try:
-        embedding = index_video(db=db, video=video)
-    except Exception:
-        db.rollback()
-        update_video_status(db, video, VideoStatus.FAILED, "知识库写入失败，请检查服务状态")
-        raise
-    update_video_status(db, video, VideoStatus.COMPLETED)
-    return VideoEmbedResponse(id=video.id, vector_id=embedding.vector_id, message=t("video_indexed"))
+    if not build_video_document(video).strip():
+        raise ApiError(t("embedding_source_required"), status.HTTP_400_BAD_REQUEST)
+    task = enqueue_video_task(db, current_user, video, "embed")
+    return VideoProcessResponse(id=video.id, status=video.status, message="知识库写入任务已入队", task_id=task.id)
