@@ -2,6 +2,11 @@
 
 记录有意义的用户可见变更和工程变更。最新日期置顶。
 
+## 2026-10-22 — 本地 AI 依赖与真实模型核查
+
+- 修复可选本地 AI 依赖解析：约束 PyTorch CPU 验证版本、PyAV 与 faster-whisper 的音频解码兼容范围，并保持 sentence-transformers/tokenizers 与现有 ChromaDB 相容；模型缓存加入 Git 忽略。
+- 独立验证镜像的 `pip check` 通过；真实 faster-whisper base 在合成中文音频上完成转写并保留识别错误，真实 BGE 在固定虚构语料上生成逐题报告。自然语音、真实视频、Supabase 和付费服务仍未验收。详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
+
 ## 2026-10-21 — 视频持久任务与独立 Worker
 
 - 后续加固：失联旧 Worker 在新 Worker 接管后不能再推进阶段、覆盖任务结果或失败状态。实际 PostgreSQL 受控长任务跨过 90 秒租约仍持续心跳；强制杀死执行进程后重新领取完成。真实媒体和外部服务阶段仍未验收。

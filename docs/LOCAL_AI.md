@@ -22,7 +22,9 @@ EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
 docker compose --profile app up -d --build backend
 ```
 
-直接在宿主机运行后端时，先安装 `requirements.txt` 和 `requirements-local-ai.txt`。Docker 把模型缓存映射到 `storage/model-cache/`，避免重建容器后重复下载。`storage/` 已被 Git 忽略。只使用字幕、云端转写或 `local_hash` 时保持 `INSTALL_LOCAL_AI=false`，不安装大型模型依赖。
+直接在宿主机运行后端时，先安装 `requirements.txt` 和 `requirements-local-ai.txt`。Docker 把模型缓存映射到 `storage/model-cache/`，避免重建容器后重复下载；模型缓存已被 Git 忽略。只使用字幕、云端转写或 `local_hash` 时保持 `INSTALL_LOCAL_AI=false`，不安装大型模型依赖。
+
+2026-10-22 在本机 Colima Linux aarch64 的独立验证镜像中已完成可选依赖安装和 `pip check`；正式后端容器仍使用默认配置。`requirements-local-ai.txt` 约束了 PyAV <19 和与 ChromaDB 0.5.23 兼容的 `tokenizers`/`transformers` 范围。若在其他 CPU 架构构建，应重新检查 PyTorch wheel 和依赖解析，不照搬本机性能数字。实际版本、模型快照与结果见 [核查记录](VERIFICATION_2026-10-22.md)。
 
 `faster_whisper` 只在视频没有字幕时使用；有字幕仍优先读取字幕。默认 `base` 模型以 CPU int8 运行。首次调用需要下载模型，耗时取决于网络和机器。未安装组件时，处理会在提取音频前报出明确错误。
 
@@ -43,4 +45,4 @@ docker compose exec backend python -m scripts.reindex_vectors
 
 ## 当前验收边界
 
-代码和模拟模型测试可以在没有真实视频和付费 Key 的情况下执行；真实模型下载、真实视频转写速度与质量、中文问答准确性仍需在目标机器上验证。`local_hash` 保持旧版单向量行为；`bge_zh` 已分段，但分段长度和回答质量仍需真实内容评测。
+本机独立镜像已下载并运行真实 faster-whisper base 与 BGE：前者对合成中文语音产生了部分错字，后者只在固定虚构语料上完成检索对照。自然语音、真实视频、正式运行容器和中文问答准确性仍需验收。`local_hash` 保持旧版单向量行为；`bge_zh` 已分段，但分段长度和回答质量仍需真实内容评测。

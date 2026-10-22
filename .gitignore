@@ -36,6 +36,7 @@ storage/notes/
 storage/tmp/
 storage/chroma/
 storage/backups/
+storage/model-cache/
 
 # Local database/vector data
 .docker/postgres/

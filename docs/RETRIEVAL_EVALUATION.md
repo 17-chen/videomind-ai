@@ -21,7 +21,7 @@ docker compose exec backend python -m scripts.evaluate_retrieval --top-k 3 --min
 docker compose exec backend python -m scripts.evaluate_retrieval --provider bge_zh --top-k 3 --output /tmp/bge-report.json
 ```
 
-BGE 需要安装 `requirements-local-ai.txt`，首次运行可能下载 `EMBEDDING_MODEL` 指定的模型。模型与分段长度会记录在报告中；此命令不会调用用户的付费模型 API。真实 BGE 尚未在本轮运行。
+BGE 需要安装 `requirements-local-ai.txt`，首次运行可能下载 `EMBEDDING_MODEL` 指定的模型。模型与分段长度会记录在报告中；此命令不会调用用户的付费模型 API。2026-10-22 已在独立本地 AI 镜像中运行真实 BGE，结果如下。
 
 `--dataset <JSON路径>` 可加载其他语料。结构参考 `backend/evals/retrieval_zh.json`。视频 ID 和问题 ID 必须唯一，正确答案必须存在且属于提问用户；空答案只允许用于没有任何视频的用户，避免把尚未实现的语义拒答能力算作成功。
 
@@ -54,3 +54,16 @@ BGE 需要安装 `requirements-local-ai.txt`，首次运行可能下载 `EMBEDDI
 `paraphrase-resume` 仍漏掉标准答案中的 `queue` 视频，召回率为 0.5，报告保留原结果。多数问题只有一个标准视频，precision@3 上限因此通常为 1/3；这组数据规模小且标签不代表真实用户的完整相关性判断。高命中率不能推断真实中文语义检索已经达标。
 
 后续应扩展真实且允许使用的转写与问答标签，再以相同语料对比 BGE、分段参数和回答引用。首次运行还出现了现有 Chroma 遥测接口兼容性警告和 ONNX CPU 提示，评测仍正常完成；本轮没有修改依赖版本或屏蔽这些提示。
+
+## 2026-10-22 真实 BGE 模型对照
+
+[BGE 逐题 JSON](../backend/evals/baseline_bge_zh.json)使用与 hash 基线相同的语料指纹 `4294248dddda86abb87d0661b238408366cf53a0bbaea7700e024c93c2066632` 和 top-k=3。模型为 `BAAI/bge-small-zh-v1.5`，本次缓存快照为 `7999e1d3359715c523056ef9478215996d62a620`；分段 350 字、重叠 60 字。
+
+| 指标 | hash | BGE |
+| --- | ---: | ---: |
+| Recall@3 | 96.43% | 100% |
+| Precision@3 | 38.10% | 40.48% |
+| MRR@3 | 1.00 | 1.00 |
+| 跨用户违规 | 0 | 0 |
+
+BGE 在 `paraphrase-resume` 命中了 hash 漏掉的第二个标准视频。样本仅有 12 条项目自编文本，且评测不包含生成回答；应继续扩充真实授权资料与人工标签，再讨论质量阈值或分段参数。
