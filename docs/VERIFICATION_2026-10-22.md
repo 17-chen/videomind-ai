@@ -19,7 +19,16 @@
 - 可选依赖验证镜像：`pip check` 无依赖冲突；接入现有 Compose PostgreSQL 网络后，后端 75 项测试通过。最初未接入该网络的一次运行在应用启动阶段无法解析 `postgres`，属于验证容器网络设置错误，修正后重跑通过。
 - 前端仅作回归，临时副本生产构建、typecheck、lint 通过；本轮未改前端代码。`git diff --check` 通过。
 
+## 公开真实视频与自然语音补验（2026-10-22）
+
+- 素材为 [Wikimedia Commons 的 NASA《One Small Step》](https://commons.wikimedia.org/wiki/File:One_Small_Step_-_NASA.webm)，页面标注 NASA 制作、美国公有领域；56.121 秒，WebM VP9/Opus，2,990,645 字节。下载副本 SHA-256 为 `b5c5aed12227844dfa623a969333a71308c41e195d631e544cd240e58517bd05`，只保存在 Git 忽略的 `storage/videos/`。
+- 独立本地 AI 镜像直接对该视频运行现有 ffmpeg 提音频和 faster-whisper base CPU int8：提音频 0.16 秒，转写 4.43 秒。真实多人通信音频可以产生非空文本；末句误识为 “One giant leap for man”，而 [NASA Apollo 11 语音记录](https://www.nasa.gov/wp-content/uploads/static/history/alsj/a11/Apollo11VoiceTranscript-Geology.pdf) 为 “mankind”。这记录了实际识别错误，不算准确率达标。
+- 进一步在一次性 PostgreSQL 容器中运行到 `20261021_0007` 迁移，使用临时媒体目录调用真实 `process_video`：Wikimedia URL 下载、无字幕提音频、转写、数据库保存成功，耗时 8.54 秒；同一真实文件经 `save_uploaded_video` 验证视频流并走上传来源的处理路径，转写保存成功，耗时 2.60 秒。默认运行的 API、Worker 和正式数据库均未切换模型或写入这组测试数据。
+- 再以另一隔离用户和 `ASR_PROVIDER=disabled` 对无字幕文件处理，得到“视频没有字幕时需要 OpenAI 转写密钥”错误，视频状态为 `failed`，未生成转写。验证结束后停止并删除一次性数据库容器与临时脚本。
+- 上述是服务函数与真实媒体的隔离验收；没有验证浏览器/HTTP 排队后的独立 Worker、真实笔记生成、向量入库、最终问答、Supabase 双用户或付费服务。一个 56 秒英文样例不能代表中文自然语音和长视频质量。
+- 本次补验后默认容器 75 项后端测试与 Ruff 通过；固定 hash 检索回归 Recall@3 为 96.43%、隔离违规 0；前端临时副本生产构建、typecheck、lint 通过，`git diff --check` 通过。该检索分数仍来自虚构语料。
+
 ## 未完成
 
-- R1 仍需允许使用的自然语音/真实视频样例、人工答案标签、分段参数对照和最终回答引用核查；真实无字幕媒体的上传到笔记完整链路尚未验收。
+- R1 已有一个允许使用的自然语音真实视频样例；仍需更多真实转写、人工答案标签、分段参数对照和最终回答引用核查；真实无字幕媒体的上传到笔记完整链路尚未验收。
 - 正式后端镜像尚未切换到可选本地 AI 配置；独立验证镜像的成功不代表上线镜像已部署。本机 Docker 默认服务未修改。

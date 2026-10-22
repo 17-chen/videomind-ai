@@ -5,7 +5,8 @@
 ## 2026-10-22 — 本地 AI 依赖与真实模型核查
 
 - 修复可选本地 AI 依赖解析：约束 PyTorch CPU 验证版本、PyAV 与 faster-whisper 的音频解码兼容范围，并保持 sentence-transformers/tokenizers 与现有 ChromaDB 相容；模型缓存加入 Git 忽略。
-- 独立验证镜像的 `pip check` 通过；真实 faster-whisper base 在合成中文音频上完成转写并保留识别错误，真实 BGE 在固定虚构语料上生成逐题报告。自然语音、真实视频、Supabase 和付费服务仍未验收。详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
+- 独立验证镜像的 `pip check` 通过；真实 faster-whisper base 在合成中文音频上完成转写并保留识别错误，真实 BGE 在固定虚构语料上生成逐题报告。
+- 后续使用 NASA 公有领域 56 秒视频，在隔离数据库中跑通真实 URL 下载、无字幕本地转写、真实文件上传来源转写和缺 Key 失败路径。转写把历史原话中的 “mankind” 识别为 “man”；笔记、向量、问答、Supabase 和付费服务仍未验收。详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
 
 ## 2026-10-21 — 视频持久任务与独立 Worker
 
