@@ -27,6 +27,7 @@
 - 再以另一隔离用户和 `ASR_PROVIDER=disabled` 对无字幕文件处理，得到“视频没有字幕时需要 OpenAI 转写密钥”错误，视频状态为 `failed`，未生成转写。验证结束后停止并删除一次性数据库容器与临时脚本。
 - 上述是服务函数与真实媒体的隔离验收；没有验证浏览器/HTTP 排队后的独立 Worker、真实笔记生成、向量入库、最终问答、Supabase 双用户或付费服务。一个 56 秒英文样例不能代表中文自然语音和长视频质量。
 - 本次补验后默认容器 75 项后端测试与 Ruff 通过；固定 hash 检索回归 Recall@3 为 96.43%、隔离违规 0；前端临时副本生产构建、typecheck、lint 通过，`git diff --check` 通过。该检索分数仍来自虚构语料。
+- 上一轮推送的 [CI 运行 39789748651](https://github.com/17-chen/videomind-ai/actions/runs/39789748651) 后端和前端通过，但提示旧版 Actions 的 Node.js 20 弃用和 `ubuntu-latest` 迁移。对照 [GitHub 官方 Action 元数据](https://github.com/actions/checkout/blob/v7/action.yml)、[GitHub 托管运行环境](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)后，升级 checkout/setup-node/upload-artifact 至 v7、setup-python 至 v6，并固定 Ubuntu 24.04；本机工作流 YAML 可解析，升级后远端结果另以对应运行记录为准。
 
 ## 未完成
 
