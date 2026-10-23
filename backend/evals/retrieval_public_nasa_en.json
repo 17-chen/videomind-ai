@@ -1,0 +1,131 @@
+{
+  "name": "videomind-public-nasa-en-v1",
+  "videos": [
+    {
+      "id": "apollo-step",
+      "user_id": "alice",
+      "title": "One Small Step",
+      "source_url": "https://commons.wikimedia.org/wiki/File:One_Small_Step_-_NASA.webm",
+      "document": "Getting back up to that first step, it's not even collapsed too far, but it's adequate to get back up. Right, here we go. Pretty just a little jump. Okay, now we can see you're coming down the ladder now. And here we come. Okay, I just checked it. Getting back up to that first step. It's not even collapsed too far, but there it is. It's one small step for man. One giant leap for man."
+    },
+    {
+      "id": "nasa-may08",
+      "user_id": "alice",
+      "title": "NASA Minute May 8, 2026",
+      "source_url": "https://commons.wikimedia.org/wiki/File:NASA_Minute_May_8,_2026.webm",
+      "document": "Across NASA, teams are testing the technologies and systems that will shape the future of exploration and aviation. Here’s what’s new this week, in your NASA Minute. This week, NASA supported the Department of War and other federal agencies in releasing files on Unidentified Anomalous Phenomena. NASA applauds President Trump’s direction for whole-of-government transparency and will always make make available our materials and expertise to the investigators at the All-domain Anomaly Resolution Office, which leads the U.S. government’s efforts to address UAP. NASA took its first steps toward rebuilding the agency’s core technical capabilities, welcoming 20 engineers and technicians into civil service roles under Administrator Isaacman’s workforce directive. By bringing critical expertise in-house, NASA is strengthening the technical foundation needed for the next era of exploration. NASA’s X-59 quiet supersonic jet is ramping up the pace of flight testing. At Armstrong Flight Research Center, the experimental aircraft recently completed two flights in one day for the first time, continuing to fly higher, faster, and through more advanced maneuvers as NASA works towards quiet, supersonic flight. NASA and Blue Origin are taking another step toward sending scientific and technology payloads to the lunar surface. At Johnson Space Center, vacuum chamber testing is helping prepare the Blue Moon Mark-1 cargo lander for a future mission to the Moon, which will carry NASA instruments to study lunar landings and improve navigation for future missions to the Moon. And finally, this week, a small NASA-supported spacecraft carrying a powerful new science instrument launched into orbit onboard a SpaceX Falcon 9 rocket. The CubeSat mission, known as SNAPPY, will test a miniaturized neutrino detector that could one day help scientists better understand fusion inside the Sun and improve space weather forecasting here on Earth. Each test, each flight, and each mission brings us closer to turning the near-impossible into a reality. We’ll see you next time on the NASA Minute!"
+    },
+    {
+      "id": "nasa-may22",
+      "user_id": "alice",
+      "title": "NASA Minute May 22, 2026",
+      "source_url": "https://commons.wikimedia.org/wiki/File:NASA_Minute_May_22,_2026.webm",
+      "document": "From the Space Station to the Red Planet, NASA’s missions continue moving forward. Here’s what’s new this week in your NASA Minute. On Thursday, NASA officially welcomed Matt Anderson as the agency’s 16th deputy administrator following his confirmation by the U.S. Senate earlier in the week. A retired U.S. Air Force colonel with decades of experience in space operations and national security, Anderson will help lead NASA’s missions in exploration, science, and aeronautics as the agency pushes towards the Moon, Mars, and beyond. Welcome to NASA, Matt! This week, NASA’s Psyche spacecraft flew past Mars, using the planet’s gravity to slingshot itself deeper into the solar system on its journey to study the asteroid Psyche. Stunning new images of the Red Planet were captured, including views of craters, the planet’s horizon, and its south polar ice cap. A SpaceX Dragon spacecraft successfully arrived at the International Space Station this week carrying over 6,000 pounds of supplies and scientific research for the Expedition 74 crew. Among the experiments delivered were studies focused on astronaut health, space weather, and Earth observation, continuing more than 25 years of scientific research aboard the orbiting laboratory. Coming up next week, NASA will provide a Moon Base update. Be sure to tune in to hear about our progress in establishing humanity’s first lunar outpost. Whether in orbit, on the way to an asteroid, or preparing for the Moon, NASA’s mission of exploration and discovery continues every day. We’ll see you next time on the NASA Minute!"
+    },
+    {
+      "id": "bob-nasa-may22",
+      "user_id": "bob",
+      "title": "Bob NASA Minute copy",
+      "source_url": "https://commons.wikimedia.org/wiki/File:NASA_Minute_May_22,_2026.webm",
+      "document": "From the Space Station to the Red Planet, NASA’s missions continue moving forward. Here’s what’s new this week in your NASA Minute. On Thursday, NASA officially welcomed Matt Anderson as the agency’s 16th deputy administrator following his confirmation by the U.S. Senate earlier in the week. A retired U.S. Air Force colonel with decades of experience in space operations and national security, Anderson will help lead NASA’s missions in exploration, science, and aeronautics as the agency pushes towards the Moon, Mars, and beyond. Welcome to NASA, Matt! This week, NASA’s Psyche spacecraft flew past Mars, using the planet’s gravity to slingshot itself deeper into the solar system on its journey to study the asteroid Psyche. Stunning new images of the Red Planet were captured, including views of craters, the planet’s horizon, and its south polar ice cap. A SpaceX Dragon spacecraft successfully arrived at the International Space Station this week carrying over 6,000 pounds of supplies and scientific research for the Expedition 74 crew. Among the experiments delivered were studies focused on astronaut health, space weather, and Earth observation, continuing more than 25 years of scientific research aboard the orbiting laboratory. Coming up next week, NASA will provide a Moon Base update. Be sure to tune in to hear about our progress in establishing humanity’s first lunar outpost. Whether in orbit, on the way to an asteroid, or preparing for the Moon, NASA’s mission of exploration and discovery continues every day. We’ll see you next time on the NASA Minute!"
+    }
+  ],
+  "cases": [
+    {
+      "id": "apollo-first-step",
+      "user_id": "alice",
+      "question": "What did the astronaut say when taking a small step on the Moon?",
+      "expected_video_ids": [
+        "apollo-step"
+      ]
+    },
+    {
+      "id": "apollo-ladder",
+      "user_id": "alice",
+      "question": "Which recording contains the conversation while an astronaut descends the lunar module ladder?",
+      "expected_video_ids": [
+        "apollo-step"
+      ]
+    },
+    {
+      "id": "snappy-neutrino",
+      "user_id": "alice",
+      "question": "Which mission tests a small neutrino detector to study fusion inside the Sun?",
+      "expected_video_ids": [
+        "nasa-may08"
+      ]
+    },
+    {
+      "id": "blue-moon-vacuum",
+      "user_id": "alice",
+      "question": "Which lunar cargo lander went through vacuum chamber testing?",
+      "expected_video_ids": [
+        "nasa-may08"
+      ]
+    },
+    {
+      "id": "x59-two-flights",
+      "user_id": "alice",
+      "question": "Which experimental aircraft completed two flights in one day during quiet supersonic testing?",
+      "expected_video_ids": [
+        "nasa-may08"
+      ]
+    },
+    {
+      "id": "psyche-mars",
+      "user_id": "alice",
+      "question": "Which spacecraft used Mars gravity to continue toward an asteroid?",
+      "expected_video_ids": [
+        "nasa-may22"
+      ]
+    },
+    {
+      "id": "dragon-cargo",
+      "user_id": "alice",
+      "question": "What report describes a Dragon spacecraft delivering supplies and research to the International Space Station?",
+      "expected_video_ids": [
+        "nasa-may22"
+      ]
+    },
+    {
+      "id": "future-moon-work",
+      "user_id": "alice",
+      "question": "Which reports discuss preparations for future work on the Moon, including a cargo lander or a lunar outpost?",
+      "expected_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ]
+    },
+    {
+      "id": "space-weather",
+      "user_id": "alice",
+      "question": "Which reports mention space weather research or forecasting?",
+      "expected_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ]
+    },
+    {
+      "id": "paraphrase-lunar-step",
+      "user_id": "alice",
+      "question": "Which historical clip shows humanity reaching the lunar surface for the first time?",
+      "expected_video_ids": [
+        "apollo-step"
+      ]
+    },
+    {
+      "id": "privacy-bob-psyche",
+      "user_id": "bob",
+      "question": "Which spacecraft flew past Mars on its way to an asteroid?",
+      "expected_video_ids": [
+        "bob-nasa-may22"
+      ]
+    },
+    {
+      "id": "empty-charlie",
+      "user_id": "charlie",
+      "question": "Which spacecraft flew past Mars?",
+      "expected_video_ids": []
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "dataset_name": "videomind-public-nasa-en-v1",
+  "dataset_sha256": "20b17d73f85810dc857c3dc2281e9db22dcb9d74bfd74050fca4f2ca782db37d",
+  "provider": "bge_zh",
+  "embedding_model": "BAAI/bge-small-zh-v1.5",
+  "embedding_dimensions": null,
+  "top_k": 2,
+  "scope": "retrieval_only_no_generation",
+  "chunking": {
+    "size": 350,
+    "overlap": 60,
+    "candidate_multiplier": 1
+  },
+  "video_count": 4,
+  "case_count": 12,
+  "relevance_case_count": 11,
+  "empty_library_case_count": 1,
+  "metrics": {
+    "hit_rate_at_k": 0.7272727272727273,
+    "recall_at_k": 0.7272727272727273,
+    "precision_at_k": 0.45454545454545453,
+    "mrr_at_k": 0.7272727272727273
+  },
+  "privacy_violation_count": 0,
+  "cases": [
+    {
+      "id": "apollo-first-step",
+      "expected_video_ids": [
+        "apollo-step"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": false,
+      "recall": 0.0,
+      "precision": 0.0,
+      "reciprocal_rank": 0.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "apollo-ladder",
+      "expected_video_ids": [
+        "apollo-step"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": false,
+      "recall": 0.0,
+      "precision": 0.0,
+      "reciprocal_rank": 0.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "snappy-neutrino",
+      "expected_video_ids": [
+        "nasa-may08"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "blue-moon-vacuum",
+      "expected_video_ids": [
+        "nasa-may08"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "x59-two-flights",
+      "expected_video_ids": [
+        "nasa-may08"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "psyche-mars",
+      "expected_video_ids": [
+        "nasa-may22"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "dragon-cargo",
+      "expected_video_ids": [
+        "nasa-may22"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "future-moon-work",
+      "expected_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 1.0,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "space-weather",
+      "expected_video_ids": [
+        "nasa-may08",
+        "nasa-may22"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 1.0,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "paraphrase-lunar-step",
+      "expected_video_ids": [
+        "apollo-step"
+      ],
+      "retrieved_video_ids": [
+        "nasa-may22",
+        "nasa-may08"
+      ],
+      "hit": false,
+      "recall": 0.0,
+      "precision": 0.0,
+      "reciprocal_rank": 0.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "privacy-bob-psyche",
+      "expected_video_ids": [
+        "bob-nasa-may22"
+      ],
+      "retrieved_video_ids": [
+        "bob-nasa-may22"
+      ],
+      "hit": true,
+      "recall": 1.0,
+      "precision": 0.5,
+      "reciprocal_rank": 1.0,
+      "foreign_or_unknown_video_ids": []
+    },
+    {
+      "id": "empty-charlie",
+      "expected_video_ids": [],
+      "retrieved_video_ids": [],
+      "hit": null,
+      "recall": null,
+      "precision": null,
+      "reciprocal_rank": null,
+      "foreign_or_unknown_video_ids": []
+    }
+  ],
+  "checks": {
+    "privacy_passed": true,
+    "recall_threshold_passed": null
+  },
+  "passed": true,
+  "minimum_recall": null
+}

@@ -57,6 +57,26 @@ def test_real_hash_evaluation_is_isolated_and_excludes_empty_libraries_from_qual
     assert settings.chroma_collection == "existing_user_collection"
 
 
+def test_public_source_url_is_used_for_indexed_result():
+    dataset = sample_dataset()
+    dataset.videos[0].source_url = "https://commons.wikimedia.org/wiki/File:Example.webm"
+
+    class RecordingStore:
+        def __init__(self):
+            self.urls = {}
+
+        def upsert_video_document(self, **kwargs):
+            self.urls[kwargs["video_id"]] = kwargs["url"]
+
+        def query_video_documents(self, **kwargs):
+            return []
+
+    store = RecordingStore()
+    evaluation.evaluate_store(dataset, store, 1)
+    assert store.urls["math"] == "https://commons.wikimedia.org/wiki/File:Example.webm"
+    assert store.urls["cooking"] == "https://example.com/evaluation/cooking"
+
+
 def test_failed_evaluation_restores_configuration(monkeypatch):
     before = settings.embedding_provider, settings.chroma_collection
 
@@ -86,3 +106,15 @@ def test_cli_rejects_invalid_dataset_before_opening_vector_store(tmp_path, capsy
     path.write_text('{"name":"missing cases"}')
     assert evaluation.main(["--dataset", str(path)]) == 2
     assert "Evaluation failed" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("options", [
+    ["--chunk-size", "0", "--provider", "bge_zh"],
+    ["--chunk-size", "100", "--chunk-overlap", "100", "--provider", "bge_zh"],
+    ["--candidate-multiplier", "0", "--provider", "bge_zh"],
+    ["--chunk-size", "100"],
+])
+def test_cli_rejects_invalid_or_irrelevant_chunk_options(options):
+    with pytest.raises(SystemExit) as exc:
+        evaluation.main(options)
+    assert exc.value.code == 2

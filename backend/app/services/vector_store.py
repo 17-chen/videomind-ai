@@ -16,6 +16,7 @@ from app.services.embeddings import current_embedding_service
 
 DOCUMENT_CHUNK_SIZE = 350
 DOCUMENT_CHUNK_OVERLAP = 60
+DOCUMENT_CANDIDATE_MULTIPLIER = 5
 
 
 @dataclass(frozen=True)
@@ -29,8 +30,20 @@ class VectorSearchResult:
 
 
 class ChromaVectorStore:
-    def __init__(self, *, client: Any | None = None) -> None:
+    def __init__(
+        self, *, client: Any | None = None,
+        chunk_size: int = DOCUMENT_CHUNK_SIZE,
+        chunk_overlap: int = DOCUMENT_CHUNK_OVERLAP,
+        candidate_multiplier: int = DOCUMENT_CANDIDATE_MULTIPLIER,
+    ) -> None:
+        if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
+            raise ValueError("chunk size must be positive and overlap must be smaller")
+        if candidate_multiplier < 1:
+            raise ValueError("candidate multiplier must be positive")
         self._client = client
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+        self._candidate_multiplier = candidate_multiplier
 
     def _collection(self) -> Any:
         try:
@@ -78,7 +91,7 @@ class ChromaVectorStore:
         document: str,
     ) -> None:
         collection = self._collection()
-        chunks = _split_document(document) if settings.embedding_provider == "bge_zh" else [document]
+        chunks = _split_document(document, self._chunk_size, self._chunk_overlap) if settings.embedding_provider == "bge_zh" else [document]
         service = current_embedding_service()
         embeddings = [service.embed_text(chunk) for chunk in chunks]
         ids = [vector_id]
@@ -121,7 +134,7 @@ class ChromaVectorStore:
     def query_video_documents(self, *, user_id: str, query: str, limit: int) -> list[VectorSearchResult]:
         collection = self._collection()
         query_embedding = current_embedding_service().embed_query(query)
-        initial_count = limit * 5 if settings.embedding_provider == "bge_zh" else limit
+        initial_count = limit * self._candidate_multiplier if settings.embedding_provider == "bge_zh" else limit
         response = self._query(collection, user_id, query_embedding, initial_count)
         results = _search_results(response, limit)
         if settings.embedding_provider != "bge_zh" or len(results) >= limit:

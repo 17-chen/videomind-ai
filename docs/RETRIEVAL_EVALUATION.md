@@ -67,3 +67,30 @@ BGE 需要安装 `requirements-local-ai.txt`，首次运行可能下载 `EMBEDDI
 | 跨用户违规 | 0 | 0 |
 
 BGE 在 `paraphrase-resume` 命中了 hash 漏掉的第二个标准视频。样本仅有 12 条项目自编文本，且评测不包含生成回答；应继续扩充真实授权资料与人工标签，再讨论质量阈值或分段参数。
+
+## 2026-10-23 公开视频文本与参数对照
+
+新增 [NASA 公开视频语料](../backend/evals/retrieval_public_nasa_en.json)：3 条英文视频文本、另一用户的一条相同文本副本，12 道人工编写并标注相关视频的问题（11 道计入质量，1 道空资料只检查隔离）。阿波罗视频文本来自 2026-10-22 实际 faster-whisper base 转写；[来源视频](https://commons.wikimedia.org/wiki/File:One_Small_Step_-_NASA.webm)，保存的转写 SHA-256 为 `e713d52dd6318ad52fcee02d28ed1674c1d9b436efdaa3464e04f5b8467486cf`。其中 “One giant leap for man” 是模型错词，保留原样。
+
+另外两条来自 [5 月 8 日 NASA Minute](https://commons.wikimedia.org/wiki/File:NASA_Minute_May_8,_2026.webm) 和 [5 月 22 日 NASA Minute](https://commons.wikimedia.org/wiki/File:NASA_Minute_May_22,_2026.webm) 的公开英文字幕；原始 SRT SHA-256 分别为 `18096023e278948c4d0ff14e6115875adf9c332ddd7e88d131d709300b02b3b1`、`5022d5194cad4a352eeba3ef02448f8abce9454236525b721d1441320a9f1fae`。语料保留来源链接。它包含同义改写、文末信息、多视频答案与跨用户相同资料，但规模很小，标签并非全面相关性标注，也没有真实中文自然语音。
+
+所有报告使用相同语料指纹 `20b17d73f85810dc857c3dc2281e9db22dcb9d74bfd74050fca4f2ca782db37d`、top-k=2 和独立内存 Chroma。BGE 模型为 `BAAI/bge-small-zh-v1.5`；数字是本次本地实际模型结果，不是模拟 embedding。下表各报告均保留逐题结果。
+
+| 设置 | Hit@2 | Recall@2 | Precision@2 | MRR@2 | 跨用户违规 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| [hash 基线](../backend/evals/public_nasa_hash_top2.json) | 72.73% | 68.18% | 40.91% | 0.6364 | 0 |
+| [BGE 200/40、候选倍数 5](../backend/evals/public_nasa_bge_200_40_m5.json) | 72.73% | 72.73% | 45.45% | 0.6818 | 0 |
+| [BGE 350/60、候选倍数 5](../backend/evals/public_nasa_bge_350_60_m5.json) | 72.73% | 72.73% | 45.45% | 0.7273 | 0 |
+| [BGE 500/80、候选倍数 5](../backend/evals/public_nasa_bge_500_80_m5.json) | 72.73% | 72.73% | 45.45% | 0.6818 | 0 |
+| [BGE 350/60、候选倍数 1](../backend/evals/public_nasa_bge_350_60_m1.json) | 72.73% | 72.73% | 45.45% | 0.7273 | 0 |
+
+三道阿波罗问题在所有 BGE 设置中均未进入前两条；hash 也漏掉这三题，并在 `space-weather` 只命中两个标准答案中的一个。候选倍数 1 与 5 的结果一致，因为检索不足两条不同视频时会继续扩大搜索。此次只比较了参数，没有据此改生产默认值。中文 BGE 处理英文资料的结果不能直接推断中文资料质量；下一步需要更多中文自然语音及跨主题样本，再定质量阈值和检查回答引用。
+
+复现命令（BGE 需使用已安装可选依赖、已缓存模型的独立环境）：
+
+```bash
+python -m scripts.evaluate_retrieval --dataset evals/retrieval_public_nasa_en.json --provider local_hash --top-k 2 --output evals/public_nasa_hash_top2.json
+python -m scripts.evaluate_retrieval --dataset evals/retrieval_public_nasa_en.json --provider bge_zh --top-k 2 --chunk-size 350 --chunk-overlap 60 --candidate-multiplier 5 --output evals/public_nasa_bge_350_60_m5.json
+```
+
+从 `backend/` 运行；把后三个参数改为表中组合即可复现其他报告。`--chunk-size`、`--chunk-overlap`、`--candidate-multiplier` 仅用于 BGE 评测，本轮未修改生产默认分段与候选数。报告的 `passed=true` 仅说明没有跨用户违规，72.73% 召回不应称为质量达标。

@@ -98,7 +98,8 @@ def test_failed_bge_update_keeps_previous_chunks(monkeypatch):
     assert not collection.deleted
 
 
-def test_bge_search_expands_when_one_video_crowds_initial_results(monkeypatch):
+@pytest.mark.parametrize(("multiplier", "expected_counts"), [(5, [10, 25]), (1, [2, 25])])
+def test_bge_search_expands_when_one_video_crowds_initial_results(monkeypatch, multiplier, expected_counts):
     monkeypatch.setattr(settings, "embedding_provider", "bge_zh")
     monkeypatch.setattr(vector_store_module, "current_embedding_service", lambda: LocalHashEmbeddingService(dimensions=8))
     requested_counts = []
@@ -106,7 +107,7 @@ def test_bge_search_expands_when_one_video_crowds_initial_results(monkeypatch):
     class CrowdedCollection:
         def query(self, *, n_results, **kwargs):
             requested_counts.append(n_results)
-            video_ids = ["alice"] * 10 + (["bob"] if n_results > 10 else [])
+            video_ids = ["alice"] * min(n_results, 10) + (["bob"] if n_results > 10 else [])
             return {
                 "documents": [[f"content {video_id}" for video_id in video_ids]],
                 "metadatas": [[{"video_id": video_id, "title": video_id, "url": "https://example.com"} for video_id in video_ids]],
@@ -116,8 +117,32 @@ def test_bge_search_expands_when_one_video_crowds_initial_results(monkeypatch):
         def count(self):
             return 25
 
-    store = ChromaVectorStore()
+    store = ChromaVectorStore(candidate_multiplier=multiplier)
     monkeypatch.setattr(store, "_collection", lambda: CrowdedCollection())
     results = store.query_video_documents(user_id="owner", query="question", limit=2)
     assert [result.video_id for result in results] == ["alice", "bob"]
-    assert requested_counts == [10, 25]
+    assert requested_counts == expected_counts
+
+
+def test_custom_bge_chunk_size_changes_indexed_segments(monkeypatch):
+    monkeypatch.setattr(settings, "embedding_provider", "bge_zh")
+    monkeypatch.setattr(vector_store_module, "current_embedding_service", lambda: LocalHashEmbeddingService(dimensions=8))
+
+    class CapturingCollection:
+        def __init__(self):
+            self.documents = []
+
+        def get(self, **kwargs):
+            return {"ids": []}
+
+        def upsert(self, **kwargs):
+            self.documents = kwargs["documents"]
+
+    collection = CapturingCollection()
+    store = ChromaVectorStore(chunk_size=100, chunk_overlap=20)
+    monkeypatch.setattr(store, "_collection", lambda: collection)
+    store.upsert_video_document(
+        vector_id="video:sample", user_id="alice", video_id="sample", title="Sample",
+        url="https://example.com/sample", category=None, source=None, document="A" * 150,
+    )
+    assert list(map(len, collection.documents)) == [100, 70]

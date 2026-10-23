@@ -2,6 +2,12 @@
 
 记录有意义的用户可见变更和工程变更。最新日期置顶。
 
+## 2026-10-23 — 真实媒体 Worker 与检索参数对照
+
+- 用一次性 PostgreSQL 和独立本地 AI Worker 完成 NASA 公开视频 URL 的持久任务：真实下载、faster-whisper 转写和任务成功状态均有记录；未运行分析、入库与问答。测试容器已清理，正式数据卷未动。
+- 检索评测新增有来源链接的 NASA 英文公开视频文本与 12 道人工问题；支持在隔离评测中指定 BGE 分段大小、重叠和候选倍数，不修改生产默认配置。保留 hash 和四组 BGE 逐题原始报告，三道阿波罗题持续漏检；详见 [评测说明](docs/RETRIEVAL_EVALUATION.md) 与 [核查记录](docs/VERIFICATION_2026-10-23.md)。
+- 后端 82 项测试、Ruff、前端隔离副本 build/typecheck/lint 通过。真实中文自然语音、服务商分析/问答、Supabase 双用户和多实例长期运行仍待验收。
+
 ## 2026-10-22 — 本地 AI 依赖与真实模型核查
 
 - 修复可选本地 AI 依赖解析：约束 PyTorch CPU 验证版本、PyAV 与 faster-whisper 的音频解码兼容范围，并保持 sentence-transformers/tokenizers 与现有 ChromaDB 相容；模型缓存加入 Git 忽略。

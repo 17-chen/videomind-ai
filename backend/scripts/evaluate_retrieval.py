@@ -10,11 +10,13 @@ from uuid import uuid4
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from app.core.config import settings
 from app.core.errors import ApiError
-from app.services.vector_store import DOCUMENT_CHUNK_OVERLAP, DOCUMENT_CHUNK_SIZE, ChromaVectorStore
+from app.services.vector_store import (
+    DOCUMENT_CANDIDATE_MULTIPLIER, DOCUMENT_CHUNK_OVERLAP, DOCUMENT_CHUNK_SIZE, ChromaVectorStore,
+)
 
 DEFAULT_DATASET = Path(__file__).resolve().parents[1] / "evals" / "retrieval_zh.json"
 
@@ -26,6 +28,7 @@ class EvaluationVideo(BaseModel):
     user_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     document: str = Field(min_length=1)
+    source_url: HttpUrl | None = None
 
 
 class EvaluationCase(BaseModel):
@@ -84,7 +87,7 @@ def evaluate_store(dataset: EvaluationDataset, store: ChromaVectorStore, top_k: 
     for video in dataset.videos:
         store.upsert_video_document(
             vector_id=f"video:{video.id}", user_id=video.user_id, video_id=video.id,
-            title=video.title, url=f"https://example.com/evaluation/{video.id}",
+            title=video.title, url=str(video.source_url) if video.source_url else f"https://example.com/evaluation/{video.id}",
             category=None, source=None, document=video.document,
         )
     owners = {video.id: video.user_id for video in dataset.videos}
@@ -110,7 +113,11 @@ def evaluate_store(dataset: EvaluationDataset, store: ChromaVectorStore, top_k: 
     }
 
 
-def run_evaluation(dataset: EvaluationDataset, *, provider: Literal["local_hash", "bge_zh"], top_k: int) -> dict:
+def run_evaluation(
+    dataset: EvaluationDataset, *, provider: Literal["local_hash", "bge_zh"], top_k: int,
+    chunk_size: int = DOCUMENT_CHUNK_SIZE, chunk_overlap: int = DOCUMENT_CHUNK_OVERLAP,
+    candidate_multiplier: int = DOCUMENT_CANDIDATE_MULTIPLIER,
+) -> dict:
     # This CLI runs in its own process. No database or persistent vector client is opened.
     previous = settings.embedding_provider, settings.chroma_collection
     settings.embedding_provider = provider
@@ -118,19 +125,22 @@ def run_evaluation(dataset: EvaluationDataset, *, provider: Literal["local_hash"
     collection = None
     try:
         client = chromadb.EphemeralClient(settings=ChromaSettings(anonymized_telemetry=False))
-        store = ChromaVectorStore(client=client)
+        store = ChromaVectorStore(
+            client=client, chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+            candidate_multiplier=candidate_multiplier,
+        )
         collection = store._collection()
         report = evaluate_store(dataset, store, top_k)
         return {
             "schema_version": 1,
             "dataset_name": dataset.name,
-            "dataset_sha256": hashlib.sha256(dataset.model_dump_json().encode()).hexdigest(),
+            "dataset_sha256": hashlib.sha256(dataset.model_dump_json(exclude_none=True).encode()).hexdigest(),
             "provider": provider,
             "embedding_model": settings.embedding_model if provider == "bge_zh" else None,
             "embedding_dimensions": settings.embedding_dimensions if provider == "local_hash" else None,
             "top_k": top_k,
             "scope": "retrieval_only_no_generation",
-            "chunking": {"size": DOCUMENT_CHUNK_SIZE, "overlap": DOCUMENT_CHUNK_OVERLAP} if provider == "bge_zh" else None,
+            "chunking": {"size": chunk_size, "overlap": chunk_overlap, "candidate_multiplier": candidate_multiplier} if provider == "bge_zh" else None,
             **report,
         }
     finally:
@@ -146,6 +156,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--provider", choices=("local_hash", "bge_zh"), default="local_hash")
     parser.add_argument("--top-k", type=int, default=3)
+    parser.add_argument("--chunk-size", type=int, default=DOCUMENT_CHUNK_SIZE)
+    parser.add_argument("--chunk-overlap", type=int, default=DOCUMENT_CHUNK_OVERLAP)
+    parser.add_argument("--candidate-multiplier", type=int, default=DOCUMENT_CANDIDATE_MULTIPLIER)
     parser.add_argument("--output", type=Path, help="Optional JSON report file")
     parser.add_argument("--min-recall", type=float, help="Fail when mean recall@k is below this value")
     args = parser.parse_args(argv)
@@ -153,9 +166,22 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--top-k must be between 1 and 10")
     if args.min_recall is not None and not 0 <= args.min_recall <= 1:
         parser.error("--min-recall must be between 0 and 1")
+    if not 1 <= args.chunk_size <= 4096 or not 0 <= args.chunk_overlap < args.chunk_size:
+        parser.error("--chunk-size must be 1..4096 and --chunk-overlap must be smaller")
+    if not 1 <= args.candidate_multiplier <= 20:
+        parser.error("--candidate-multiplier must be 1..20")
+    if args.provider == "local_hash" and (
+        args.chunk_size != DOCUMENT_CHUNK_SIZE or args.chunk_overlap != DOCUMENT_CHUNK_OVERLAP
+        or args.candidate_multiplier != DOCUMENT_CANDIDATE_MULTIPLIER
+    ):
+        parser.error("chunk and candidate options require --provider bge_zh")
     try:
         dataset = EvaluationDataset.model_validate_json(args.dataset.read_text(encoding="utf-8"))
-        report = run_evaluation(dataset, provider=args.provider, top_k=args.top_k)
+        report = run_evaluation(
+            dataset, provider=args.provider, top_k=args.top_k,
+            chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap,
+            candidate_multiplier=args.candidate_multiplier,
+        )
         privacy_passed = report["privacy_violation_count"] == 0
         recall_passed = None if args.min_recall is None else report["metrics"]["recall_at_k"] >= args.min_recall
         report["checks"] = {"privacy_passed": privacy_passed, "recall_threshold_passed": recall_passed}
