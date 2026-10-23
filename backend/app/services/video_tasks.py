@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,21 @@ ACTIVE_TASK_STATUSES = ("queued", "running")
 def enqueue_video_task(db: Session, user: User, video: Video, kind: str) -> VideoTask:
     if kind not in ("process", "run", "analyze", "embed"):
         raise ValueError("unsupported video task kind")
+    # Serialize admissions for this user across API instances before counting active tasks.
+    db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+    current_status = db.scalar(select(Video.status).where(Video.id == video.id, Video.user_id == user.id))
+    if current_status in ACTIVE_VIDEO_STATUSES:
+        db.rollback()
+        raise ApiError(t("video_already_processing"), status.HTTP_409_CONFLICT)
+    active_count = db.scalar(
+        select(func.count(VideoTask.id)).where(
+            VideoTask.user_id == user.id,
+            VideoTask.status.in_(ACTIVE_TASK_STATUSES),
+        )
+    ) or 0
+    if active_count >= settings.max_active_video_tasks_per_user:
+        db.rollback()
+        raise ApiError(t("video_task_limit_reached"), status.HTTP_429_TOO_MANY_REQUESTS)
     result = db.execute(
         update(Video)
         .where(Video.id == video.id, Video.user_id == user.id, Video.status.not_in(ACTIVE_VIDEO_STATUSES))

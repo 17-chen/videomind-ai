@@ -70,6 +70,30 @@ def test_task_is_durable_owned_and_cancelled_before_claim(task_api):
     assert client.post(url + "/task/cancel", headers=auth("alice")).status_code == 409
 
 
+def test_user_task_limit_counts_queued_and_running_and_releases_cancelled(task_api, monkeypatch):
+    client, engine = task_api
+    monkeypatch.setattr(settings, "max_active_video_tasks_per_user", 2)
+    first, second, third = [create_video(client) for _ in range(3)]
+    assert client.post(f"/api/v1/videos/{first}/process", headers=auth("alice")).status_code == 202
+    with Session(engine) as db:
+        assert video_tasks.claim_next_task(db, "worker-a").video_id == first
+    assert client.post(f"/api/v1/videos/{second}/process", headers=auth("alice")).status_code == 202
+    assert client.post(f"/api/v1/videos/{first}/process", headers=auth("alice")).status_code == 409
+
+    limited = client.post(f"/api/v1/videos/{third}/process", headers=auth("alice"))
+    assert limited.status_code == 429
+    assert "任务已达上限" in limited.json()["detail"]
+    assert client.get(f"/api/v1/videos/{third}", headers=auth("alice")).json()["status"] == "created"
+    with Session(engine) as db:
+        assert db.query(VideoTask).filter(VideoTask.user_id == db.get(Video, first).user_id).count() == 2
+
+    bob = client.post("/api/v1/videos", headers=auth("bob"), json={"url": "https://example.com/bob-video", "tags": []})
+    assert bob.status_code == 201
+    assert client.post(f"/api/v1/videos/{bob.json()['id']}/process", headers=auth("bob")).status_code == 202
+    assert client.post(f"/api/v1/videos/{second}/task/cancel", headers=auth("alice")).status_code == 200
+    assert client.post(f"/api/v1/videos/{third}/process", headers=auth("alice")).status_code == 202
+
+
 def test_worker_claim_and_resume_policy(task_api):
     client, engine = task_api
     video_id = create_video(client)
@@ -193,3 +217,51 @@ def test_old_worker_cannot_advance_or_fail_reclaimed_task(task_api, monkeypatch,
         assert task.status == "running"
         assert task.worker_id == "worker-b"
         assert task.error is None
+
+
+def test_run_retry_after_vector_failure_reuses_transcript_and_summary(task_api, monkeypatch):
+    client, engine = task_api
+    video_id = create_video(client)
+    calls = {"transcription": 0, "analysis": 0, "embedding": 0}
+
+    def fake_process(db, video, final_status):
+        calls["transcription"] += 1
+        video.transcript = Transcript(content="Recovered transcript")
+        db.commit()
+
+    def fake_analyze(db, video):
+        calls["analysis"] += 1
+        video.summary = Summary(summary="Recovered summary")
+        db.commit()
+
+    def flaky_index(db, video):
+        calls["embedding"] += 1
+        if calls["embedding"] == 1:
+            raise RuntimeError("temporary vector outage")
+        video.embedding = Embedding(vector_id=f"video:{video.id}")
+        db.commit()
+
+    monkeypatch.setattr(video_tasks, "process_video", fake_process)
+    monkeypatch.setattr(video_tasks, "analyze_video", fake_analyze)
+    monkeypatch.setattr(video_tasks, "index_video", flaky_index)
+
+    with Session(engine) as db:
+        video = db.get(Video, video_id)
+        first_id = video_tasks.enqueue_video_task(db, video.user, video, "run").id
+        assert video_tasks.claim_next_task(db, "worker-a").id == first_id
+        video_tasks.execute_claimed_task(db, first_id, "worker-a")
+        assert db.get(VideoTask, first_id).status == "failed"
+        assert db.get(Video, video_id).transcript.content == "Recovered transcript"
+        assert db.get(Video, video_id).summary.summary == "Recovered summary"
+
+    retry = client.post(f"/api/v1/videos/{video_id}/run", headers=auth("alice"))
+    assert retry.status_code == 202
+    with Session(engine) as db:
+        retry_id = retry.json()["task_id"]
+        assert video_tasks.claim_next_task(db, "worker-b").id == retry_id
+        video_tasks.execute_claimed_task(db, retry_id, "worker-b")
+        assert db.get(VideoTask, retry_id).status == "succeeded"
+        video = db.get(Video, video_id)
+        assert video.embedding.vector_id == f"video:{video_id}"
+        assert video.status == "completed"
+    assert calls == {"transcription": 1, "analysis": 1, "embedding": 2}

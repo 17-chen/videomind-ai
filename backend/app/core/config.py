@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +53,7 @@ class Settings(BaseSettings):
     local_whisper_device: str = "cpu"
     local_whisper_compute_type: str = "int8"
     recover_interrupted_tasks_on_startup: bool = True
+    max_active_video_tasks_per_user: int = Field(default=2, ge=1, le=100)
 
     video_storage_dir: str = "/app/storage/videos"
     audio_storage_dir: str = "/app/storage/audio"

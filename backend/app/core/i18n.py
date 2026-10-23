@@ -1,6 +1,7 @@
 ZH_CN_MESSAGES: dict[str, str] = {
     "internal_server_error": "服务器内部错误",
     "video_already_processing": "视频正在处理中，请勿重复触发",
+    "video_task_limit_reached": "当前处理任务已达上限，请等待完成或取消一个任务后重试",
     "video_not_found": "未找到该视频",
     "video_processing_started": "视频处理任务已启动",
     "transcript_required": "请先完成视频转写，再启动 AI 分析",
