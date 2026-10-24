@@ -25,7 +25,28 @@ CHUNK_SIZE = 1024 * 1024
 
 
 def upload_policy() -> dict:
-    return {"max_bytes": settings.max_upload_mb * 1024 * 1024, "extensions": list(UPLOAD_EXTENSIONS)}
+    return {
+        "max_bytes": settings.max_upload_mb * 1024 * 1024,
+        "max_user_upload_bytes": settings.max_user_upload_mb * 1024 * 1024,
+        "extensions": list(UPLOAD_EXTENSIONS),
+    }
+
+
+def _check_user_upload_quota(db: Session, user: User, incoming_bytes: int) -> None:
+    # Serialize admissions across API instances before publishing the new file.
+    db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+    paths = db.scalars(
+        select(Video.media_path).where(Video.user_id == user.id, Video.source == "upload")
+    )
+    used_bytes = 0
+    for path in paths:
+        if path:
+            try:
+                used_bytes += Path(path).stat().st_size
+            except FileNotFoundError:
+                pass
+    if used_bytes + incoming_bytes > settings.max_user_upload_mb * 1024 * 1024:
+        raise ApiError("已达到个人上传视频存储上限，请先删除不需要的视频", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
 
 def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | None = None) -> Video:
@@ -59,6 +80,8 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
         checksum = digest.hexdigest()
         if db.scalar(select(Video.id).where(Video.user_id == user.id, Video.upload_sha256 == checksum)):
             raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT)
+
+        _check_user_upload_quota(db, user, byte_count)
 
         os.replace(partial_path, final_path)
         video = Video(

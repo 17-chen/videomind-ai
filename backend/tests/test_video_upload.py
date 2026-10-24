@@ -90,6 +90,7 @@ def test_upload_rejects_unsupported_oversize_and_invalid_media(upload_api, monke
     policy = client.get("/api/v1/videos/upload-policy", headers=auth("alice"))
     assert policy.status_code == 200
     assert policy.json()["max_bytes"] == 1024 * 1024
+    assert policy.json()["max_user_upload_bytes"] == 5120 * 1024 * 1024
     assert upload(client, filename="fake.txt").status_code == 415
     assert upload(client, contents=b"x" * (1024 * 1024 + 1)).status_code == 413
 
@@ -99,6 +100,18 @@ def test_upload_rejects_unsupported_oversize_and_invalid_media(upload_api, monke
     monkeypatch.setattr(video_upload, "_probe_video", reject)
     assert upload(client).status_code == 415
     assert not list((root / "videos").glob("*"))
+
+
+def test_user_upload_quota_is_isolated_and_delete_releases_bytes(upload_api, monkeypatch):
+    client, _, root = upload_api
+    monkeypatch.setattr(settings, "max_user_upload_mb", 1)
+    first = upload(client, contents=b"a" * (700 * 1024))
+    assert first.status_code == 201
+    assert upload(client, contents=b"b" * (400 * 1024)).status_code == 413
+    assert not list((root / "videos").glob("*.part"))
+    assert upload(client, name="bob", contents=b"b" * (400 * 1024)).status_code == 201
+    assert client.delete(f"/api/v1/videos/{first.json()['id']}", headers=auth("alice")).status_code == 204
+    assert upload(client, contents=b"b" * (400 * 1024)).status_code == 201
 
 
 def test_uploaded_video_uses_local_media_without_downloading(monkeypatch, tmp_path):
