@@ -105,6 +105,7 @@ def test_upload_rejects_unsupported_oversize_and_invalid_media(upload_api, monke
 def test_user_upload_quota_is_isolated_and_delete_releases_bytes(upload_api, monkeypatch):
     client, _, root = upload_api
     monkeypatch.setattr(settings, "max_user_upload_mb", 1)
+    monkeypatch.setattr(videos.vector_store, "delete_video_document", lambda **kwargs: None)
     first = upload(client, contents=b"a" * (700 * 1024))
     assert first.status_code == 201
     assert upload(client, contents=b"b" * (400 * 1024)).status_code == 413
