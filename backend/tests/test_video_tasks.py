@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api import dependencies
+from app.api.v1.routes import chat as chat_routes
 from app.api.dependencies import get_db
 from app.core.config import settings
 from app.database.base import Base
 from app.main import app
 from app.models import AiSettings, Embedding, RequestWindow, Summary, Transcript, User, Video, VideoTask  # noqa: F401
 from app.services import video_tasks
+from app.services.rag import RagChatResult
 from app.services.auth import AuthIdentity
 
 
@@ -119,6 +121,7 @@ def test_video_task_request_rate_limit_counts_duplicate_attempts(task_api, monke
 def test_chat_rate_limit_is_per_user(task_api, monkeypatch):
     client, _ = task_api
     monkeypatch.setattr(settings, "max_chat_requests_per_minute", 1)
+    monkeypatch.setattr(chat_routes, "chat_with_videos", lambda **kwargs: RagChatResult(answer="empty", sources=[]))
     payload = {"question": "What is in my library?", "language": "en"}
     assert client.post("/api/v1/chat", headers=auth("alice"), json=payload).status_code == 200
     assert client.post("/api/v1/chat", headers=auth("alice"), json=payload).status_code == 429

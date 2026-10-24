@@ -12,6 +12,7 @@
 - 一次性 PostgreSQL 16 从空库迁移到 `20261024_0008`；问答计数及最终视频任务接口入口分别以两个独立会话同时竞争上限 1，均为一成功、一返回 429，计数为 1。一次性容器已移除，没有使用正式数据卷。
 - 本机开发服务自动建出了新表，但 Alembic 仍停在旧版本。迁移加入结构核验后，先将原 PostgreSQL 备份到被 Git 忽略的 `storage/backups/videomind-before-request-window-20261024.dump`；备份非空且 `pg_restore -l` 可解析。随后迁移到 `20261024_0008 (head)`，API readiness 返回 `database=ok`、`vector_store=ok`。未清理或覆盖现有数据卷。
 - 完整后端 `python -m pytest -q`：88 passed，1 条 LangGraph 依赖弃用警告；`ruff check app tests scripts alembic/versions`：通过。前端没有代码改动，远端 CI 仍需以本次提交的运行结果为准。
+- 首次推送的 [GitHub Actions 运行 40054944025](https://github.com/17-chen/videomind-ai/actions/runs/40054944025) 前端通过、后端 87/88 通过；新增问答限流测试错误地依赖默认持久 Chroma 路径，CI 中 `/app` 不可写而返回 503。现已把该测试的问答服务替换为隔离空结果，仅验证限流行为；这是测试环境隔离修复，不是线上服务故障。修复提交的 CI 结果需单独核对。
 
 ## 边界
 
