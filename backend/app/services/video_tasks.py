@@ -17,6 +17,7 @@ from app.models.video import Video, VideoStatus
 from app.models.video_task import VideoTask
 from app.services.analysis import analyze_video
 from app.services.rag import index_video
+from app.services.request_limits import lock_user_for_limits
 from app.services.video_processing.pipeline import process_video
 from app.services.videos import ACTIVE_VIDEO_STATUSES, get_video_for_user, update_video_status
 
@@ -29,7 +30,7 @@ def enqueue_video_task(db: Session, user: User, video: Video, kind: str) -> Vide
     if kind not in ("process", "run", "analyze", "embed"):
         raise ValueError("unsupported video task kind")
     # Serialize admissions for this user across API instances before counting active tasks.
-    db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+    lock_user_for_limits(db, user.id)
     current_status = db.scalar(select(Video.status).where(Video.id == video.id, Video.user_id == user.id))
     if current_status in ACTIVE_VIDEO_STATUSES:
         db.rollback()

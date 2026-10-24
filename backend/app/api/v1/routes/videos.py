@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
+from app.core.config import settings
 from app.core.i18n import t
 from app.core.errors import ApiError
 from app.models.user import User
 from app.schemas.video import VideoCreate, VideoListResponse, VideoNoteUpdate, VideoProcessResponse, VideoRead, VideoTaskRead, VideoUpdate
 from app.services.ai_settings import resolve_llm
 from app.services.rag import build_video_document
+from app.services.request_limits import consume_request, lock_user_for_limits
 from app.services.video_tasks import cancel_video_task_for_user, enqueue_video_task, latest_video_task_for_user
 from app.services.video_upload import save_uploaded_video, upload_policy
 from app.services.videos import (
@@ -164,6 +166,7 @@ def process_video(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
+    _reserve_video_task_request(db, current_user)
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     task = enqueue_video_task(db, current_user, video, "process")
     return VideoProcessResponse(id=video.id, status=video.status, message=t("video_processing_started"), task_id=task.id)
@@ -181,6 +184,7 @@ def run_video(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
+    _reserve_video_task_request(db, current_user)
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     if video.summary is None:
         resolve_llm(current_user)
@@ -219,6 +223,7 @@ def analyze_video(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
+    _reserve_video_task_request(db, current_user)
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     if video.transcript is None or not video.transcript.content.strip():
         raise ApiError(t("transcript_required"), status.HTTP_400_BAD_REQUEST)
@@ -239,8 +244,15 @@ def embed_video(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
+    _reserve_video_task_request(db, current_user)
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     if not build_video_document(video).strip():
         raise ApiError(t("embedding_source_required"), status.HTTP_400_BAD_REQUEST)
     task = enqueue_video_task(db, current_user, video, "embed")
     return VideoProcessResponse(id=video.id, status=video.status, message="知识库写入任务已入队", task_id=task.id)
+
+
+def _reserve_video_task_request(db: Session, user: User) -> None:
+    lock_user_for_limits(db, user.id)
+    consume_request(db, user.id, "video_task", settings.max_video_task_requests_per_minute)
+    db.commit()

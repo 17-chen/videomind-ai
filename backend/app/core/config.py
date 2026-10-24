@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     local_whisper_compute_type: str = "int8"
     recover_interrupted_tasks_on_startup: bool = True
     max_active_video_tasks_per_user: int = Field(default=2, ge=1, le=100)
+    max_chat_requests_per_minute: int = Field(default=20, ge=1, le=1000)
+    max_video_task_requests_per_minute: int = Field(default=10, ge=1, le=1000)
 
     video_storage_dir: str = "/app/storage/videos"
     audio_storage_dir: str = "/app/storage/audio"

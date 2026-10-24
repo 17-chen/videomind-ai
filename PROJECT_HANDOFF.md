@@ -1,6 +1,6 @@
 # VideoMind AI 完整交接文档
 
-> 更新：2026-10-23。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
+> 更新：2026-10-24。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
 
 ## 1. 先读摘要
 
@@ -9,12 +9,12 @@
 - **真实仓库：**`/Users/chenxin/Documents/Codex 2/videomind-ai`。
 - **GitHub：**`https://github.com/17-chen/videomind-ai`；remote 为 `git@github.com:17-chen/videomind-ai.git`，主分支 `main`。
 - **最近功能基线：**2026-10-21 增加 PostgreSQL 视频任务、独立 Worker 和 `20261021_0007` 迁移；2026-10-22 补了本地 AI 兼容性与真实公开视频处理验收。恢复时以实际 Git 为准。
-- **2026-10-23 后续开工前：**工作树干净，本地 `main` 与 `origin/main` 一致，提交 `7ff0497`；完成时再次核对实际 Git 状态。
-- **最新后端证据：**2026-10-23，默认容器 84 项测试及 Ruff 通过；新增每用户活动任务上限和模拟向量故障续跑，一次性 PostgreSQL 双会话竞争通过。真实 NASA URL 的持久任务、真实英文资料 hash/BGE 检索对照及失败题见 [核查记录](docs/VERIFICATION_2026-10-23.md)。
+- **2026-10-24 开工前：**工作树干净，本地 `main` 与 `origin/main` 一致，提交 `e7e6a85`；完成时再次核对实际 Git 状态。
+- **最新后端证据：**2026-10-24，后端 88 项测试及 Ruff 通过；问答和任务请求新增 PostgreSQL 持久分钟限流，一次性 PostgreSQL 双会话竞争通过。本机数据库备份后迁移至 `20261024_0008`，readiness 正常，详见 [核查记录](docs/VERIFICATION_2026-10-24.md)。
 - **最新前端证据：**2026-10-23，临时副本的生产构建、typecheck、lint 通过；任务阶段和取消入口已接入。
-- **自动检查：**开工前最近的 [GitHub Actions](https://github.com/17-chen/videomind-ai/actions/runs/39927338235) 后端、前端任务均通过；新提交以其实际运行结果为准。R9 仅自动检查子项完成。
+- **自动检查：**开工前最近的 [GitHub Actions](https://github.com/17-chen/videomind-ai/actions/runs/39948495076) 后端、前端任务均通过；新提交以其实际运行结果为准。R9 仅自动检查子项完成。
 - **2026-10-22 本地模型证据：**独立镜像的可选依赖与 `pip check` 通过；faster-whisper base 已转写合成中文音频及一个 NASA 真实公开视频。后者的 URL 下载、本地上传、无字幕缺 Key 失败路径在隔离数据库通过；真实 BGE 在固定虚构语料上完成隔离检索，详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
-- **下一步：**R1 补中文自然语音与跨主题样本、核对回答引用；R2 完成真实分析/问答；R8 补用户存储和请求频率限制，R5 继续真实媒体故障与多实例长期运行验收。
+- **下一步：**R1 补中文自然语音与跨主题样本、核对回答引用；R2 完成真实分析/问答；R8 补用户存储总量和匿名流量控制，R5 继续真实媒体故障与多实例长期运行验收。
 - **本轮未完成的验收：**中文自然语音质量、真实笔记/向量/问答、Supabase/服务商调用和多实例运行仍待验证；英文公开视频的 72.73% Recall@2 也不是完整服务质量验收。
 
 先读本文件，再读 [剩余工作](docs/COMPLETION_PLAN.md)、[项目上下文](PROJECT_CONTEXT.md)、[TODO](TODO.md)。详细索引见 [项目资料](docs/PROJECT_MATERIALS.md)；新聊天开场文字见 [恢复说明](docs/NEW_CHAT_START.md)。
@@ -68,7 +68,7 @@
 | 本地上传 | 代码已实现 | 自生成视频的真实本地 HTTP 上传、重复冲突、删除清理及模拟处理链路通过；NASA 真实文件的上传来源与本地 ASR 在隔离数据库通过，本人模型与双用户验收未做 |
 | 资料编辑 | 代码已实现 | 本地 API 编辑/筛选、权限与模拟向量故障通过；真实多用户与模型未验收 |
 | 持久任务、取消 | 本地代码已实现 | API 重启保留任务、独立 Worker、双 Worker 竞争、受控长任务心跳与执行进程 SIGKILL 恢复通过；真实 NASA URL 的 Worker 下载/转写通过。每用户排队加运行任务默认最多 2 个，PostgreSQL 双会话入队限制通过；真实媒体故障、付费阶段和多实例未验收 |
-| 云存储/pgvector、配额监控、正式部署 | 未完成 | 详见 R6、R8、R9 |
+| 云存储/pgvector、配额监控、正式部署 | 未完成 | 活动任务和本人问答/入队分钟限制已有本地验证；存储总量、匿名流量、监控及部署仍见 R6、R8、R9 |
 
 ## 5. 关键实现约束
 
@@ -78,6 +78,7 @@
 - **用户隔离：**视频查询、分类、处理和删除按 user_id；向量检索也有 user_id 过滤。未来上传、任务和存储接口必须继承同一边界。
 - **任务：**处理、分析、入库目前使用 PostgreSQL VideoTask 与独立 Worker；同视频活动任务由状态与部分唯一索引保护。失联租约可恢复，旧 Worker 在接管后不能推进下一阶段或覆盖任务终态。分析和可能已计费的云端转写中断要求手动重试。取消在阶段边界生效，不能中断当前外部调用；在途调用的外部副作用仍需单独评估。
 - **任务名额：**每用户 `queued` + `running` 总数默认上限 2，由 `MAX_ACTIVE_VIDEO_TASKS_PER_USER` 配置；入队锁定用户行，超限 429，同视频重复 409。取消排队任务立即释放名额；这是任务接收限制，不限制 Worker 的并行执行数。
+- **请求频率：**问答和视频任务请求分别按用户在 PostgreSQL 记录 60 秒窗口，默认 20/10 次，由 `MAX_CHAT_REQUESTS_PER_MINUTE`、`MAX_VIDEO_TASK_REQUESTS_PER_MINUTE` 配置；超限 429。接口处理前提交计数，重复任务请求也计数。demo 用户共享名额，匿名访问和用户存储总量仍待限制。
 - **安全索引：**BGE 新分段使用内容版本 ID，先写入新版本，再清理旧版本；新写入失败时旧内容可继续检索。清理失败可能短时留两版，由检索按视频去重。
 - **删除顺序：**先删本人向量，再提交数据库删除，再清理本地文件。跨存储不具有原子事务；失败边界见技术决策日志。
 - **模型切换：**hash 与 BGE 使用不同集合；切换模型后要显式重建。重建先 dry-run，实际重建会写向量。
@@ -105,7 +106,7 @@
 - 本机 VideoMind API 使用 `http://localhost:8001`，容器内部后端仍为 8000；此前宿主 8000 被另一项目占用。
 - Docker 实际使用 Colima socket：`unix:///Users/chenxin/.colima/default/docker.sock`。默认 Docker Desktop socket 不存在不代表项目停机。
 - 后端/前端/PostgreSQL/Worker 容器分别为 `videomind-backend`、`videomind-frontend`、`videomind-postgres`、`videomind-worker`。
-- 2026-10-21 本机实测 Alembic 版本为 `20261021_0007 (head)`；新环境要核对实际版本并迁移，不盲目 stamp。
+- 2026-10-24 本机实测 Alembic 版本为 `20261024_0008 (head)`；迁移前备份保存在被 Git 忽略的 `storage/backups/`。新环境要核对实际版本并迁移，不盲目 stamp。
 - 之前为 demo 认证、embedded Chroma、local_hash、ASR disabled。实际值只在授权环境检查，不把 `.env` 整份输出。
 - `storage/model-cache/` 映射模型缓存并已加入 Git 忽略；2026-10-22 两个模型已在独立验证镜像中下载，可选依赖仍未安装到默认运行容器。
 

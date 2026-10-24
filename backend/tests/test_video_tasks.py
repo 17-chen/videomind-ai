@@ -11,7 +11,7 @@ from app.api.dependencies import get_db
 from app.core.config import settings
 from app.database.base import Base
 from app.main import app
-from app.models import AiSettings, Embedding, Summary, Transcript, User, Video, VideoTask  # noqa: F401
+from app.models import AiSettings, Embedding, RequestWindow, Summary, Transcript, User, Video, VideoTask  # noqa: F401
 from app.services import video_tasks
 from app.services.auth import AuthIdentity
 
@@ -92,6 +92,37 @@ def test_user_task_limit_counts_queued_and_running_and_releases_cancelled(task_a
     assert client.post(f"/api/v1/videos/{bob.json()['id']}/process", headers=auth("bob")).status_code == 202
     assert client.post(f"/api/v1/videos/{second}/task/cancel", headers=auth("alice")).status_code == 200
     assert client.post(f"/api/v1/videos/{third}/process", headers=auth("alice")).status_code == 202
+
+
+def test_video_task_request_rate_limit_counts_successful_admissions(task_api, monkeypatch):
+    client, _ = task_api
+    monkeypatch.setattr(settings, "max_video_task_requests_per_minute", 2)
+    first, second, third = [create_video(client) for _ in range(3)]
+    for video_id in (first, second):
+        assert client.post(f"/api/v1/videos/{video_id}/process", headers=auth("alice")).status_code == 202
+        assert client.post(f"/api/v1/videos/{video_id}/task/cancel", headers=auth("alice")).status_code == 200
+    rejected = client.post(f"/api/v1/videos/{third}/process", headers=auth("alice"))
+    assert rejected.status_code == 429
+    assert "频繁" in rejected.json()["detail"]
+    assert client.get(f"/api/v1/videos/{third}", headers=auth("alice")).json()["status"] == "created"
+
+
+def test_video_task_request_rate_limit_counts_duplicate_attempts(task_api, monkeypatch):
+    client, _ = task_api
+    monkeypatch.setattr(settings, "max_video_task_requests_per_minute", 2)
+    first, second = [create_video(client) for _ in range(2)]
+    assert client.post(f"/api/v1/videos/{first}/process", headers=auth("alice")).status_code == 202
+    assert client.post(f"/api/v1/videos/{first}/process", headers=auth("alice")).status_code == 409
+    assert client.post(f"/api/v1/videos/{second}/process", headers=auth("alice")).status_code == 429
+
+
+def test_chat_rate_limit_is_per_user(task_api, monkeypatch):
+    client, _ = task_api
+    monkeypatch.setattr(settings, "max_chat_requests_per_minute", 1)
+    payload = {"question": "What is in my library?", "language": "en"}
+    assert client.post("/api/v1/chat", headers=auth("alice"), json=payload).status_code == 200
+    assert client.post("/api/v1/chat", headers=auth("alice"), json=payload).status_code == 429
+    assert client.post("/api/v1/chat", headers=auth("bob"), json=payload).status_code == 200
 
 
 def test_worker_claim_and_resume_policy(task_api):
