@@ -62,7 +62,7 @@ class ChromaVectorStore:
                 metadata={"hnsw:space": "cosine"},
             )
         except Exception as exc:
-            logger.exception("Failed to connect ChromaDB")
+            logger.error("Failed to connect ChromaDB: {}", type(exc).__name__)
             raise ApiError(t("chroma_unavailable"), status.HTTP_503_SERVICE_UNAVAILABLE) from exc
 
     @staticmethod

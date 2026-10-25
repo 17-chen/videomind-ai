@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-24。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-10-25。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 ## 项目基本信息
 
@@ -19,7 +19,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 技术架构
 
-- 前端：Next.js 16.3.3、React 19、TypeScript、Tailwind CSS。
+- 前端：Next.js 16.4.3、React 19、TypeScript、Tailwind CSS。
 - 后端：Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。
 - 数据：PostgreSQL 保存用户、视频、转写、摘要和向量映射；本地目录保存视频、音频和笔记。
 - 视频：yt-dlp 下载、字幕优先，缺字幕时抽取音频；默认 `ASR_PROVIDER=disabled`，可选安装本地 faster-whisper 或使用用户的 OpenAI 转写 Key。
@@ -30,6 +30,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-10-25 补充：**新增 API 请求编号和脱敏路由日志，关闭新启动实例的 Uvicorn 原始访问日志与 Loguru 局部变量诊断。后端 92 项测试及 Ruff 通过；前端升级 Next.js 16.4.3 后生产镜像、HTTP 页面烟测、typecheck/lint 通过。npm 审计已无 high/critical，Tailwind 3 构建链仍有 4 项 moderate。当前后端默认镜像改用 Debian 官方 HTTPS 源，在 Colima 从源码构建成功，独立镜像应用导入、媒体工具与 `pip check` 通过；云平台仍待验收。详见 [核查记录](docs/VERIFICATION_2026-10-25.md)。
 
 **2026-10-24 补充：**问答及视频任务请求新增 PostgreSQL 持久的每用户 60 秒窗口限流，默认分别 20 次、10 次，超限 429；重复任务请求也计数，使用用户行锁保证跨 API 会话串行判断。一次性 PostgreSQL 双会话同时请求验证两类操作均一成功一拒绝。本机现有数据库在已忽略目录备份后迁移至 `20261024_0008`，readiness 正常。后端 88 项测试及 Ruff 通过；用户存储总量、匿名流量、长期负载和真实 Supabase/付费服务尚未验收。详见 [核查记录](docs/VERIFICATION_2026-10-24.md)。
 

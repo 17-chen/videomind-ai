@@ -28,7 +28,7 @@ def process_video_by_id(video_id: str) -> None:
 
         process_video(db=db, video=video)
     except Exception as exc:
-        logger.error("Background video processing stopped for {}: {}", video_id, exc)
+        logger.error("Background video processing stopped for {}: {}", video_id, type(exc).__name__)
     finally:
         db.close()
 
@@ -111,4 +111,4 @@ def _mark_failed(db: Session, video: Video, message: str) -> None:
     video.processing_error = message[:4000]
     db.add(video)
     db.commit()
-    logger.error("Video processing failed for {}: {}", video.id, message)
+    logger.error("Video processing failed for {}", video.id)

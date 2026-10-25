@@ -31,7 +31,7 @@ VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没
 已完成内容：
 
 - 使用 monorepo 组织前端、后端、文档和本地存储目录。
-- 前端使用 Next.js 16.3.3、React 19、TypeScript 和 Tailwind CSS。
+- 前端使用 Next.js 16.4.3、React 19、TypeScript 和 Tailwind CSS。
 - 后端规划为 Python FastAPI、SQLAlchemy、PostgreSQL。
 - 使用 Docker Compose 管理 PostgreSQL、Adminer 和应用服务；本地 Chroma 默认嵌入后端，独立服务按需启用。
 - 实现 URL 视频下载、字幕优先解析和音频提取；ASR 默认为关闭，可选安装本地 faster-whisper。
@@ -96,7 +96,7 @@ videomind-ai/
 
 ### Frontend
 
-- Next.js 16.3.3
+- Next.js 16.4.3
 - React 19
 - TypeScript
 - Tailwind CSS 与项目内 UI 组件

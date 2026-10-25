@@ -20,13 +20,20 @@ class ErrorResponse(BaseModel):
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
-        logger.warning("{} {} failed: {}", request.method, request.url.path, exc.message)
+        logger.warning(
+            "API error request_id={} status={}",
+            getattr(request.state, "request_id", "unknown"), exc.status_code,
+        )
         return JSONResponse(status_code=exc.status_code, content=ErrorResponse(detail=exc.message).model_dump())
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled error on {} {}", request.method, request.url.path)
+        logger.error(
+            "Unhandled error request_id={} type={}",
+            getattr(request.state, "request_id", "unknown"), type(exc).__name__,
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=ErrorResponse(detail=t("internal_server_error")).model_dump(),
+            headers={"X-Request-ID": getattr(request.state, "request_id", "unknown")},
         )

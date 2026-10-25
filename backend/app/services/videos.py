@@ -244,7 +244,7 @@ def _cleanup_video_files(video_id: str) -> None:
                 try:
                     path.unlink()
                 except OSError as exc:
-                    logger.warning("Could not remove generated video file {}: {}", path, type(exc).__name__)
+                    logger.warning("Could not remove generated file for video {}: {}", video_id, type(exc).__name__)
 
 
 def detect_video_source(url: str) -> str | None:
