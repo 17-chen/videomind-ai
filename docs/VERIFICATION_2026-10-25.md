@@ -15,6 +15,7 @@
 
 - 原 Dockerfile 在 Colima 的 Debian HTTP 软件源下载索引处两次停滞；同一基础容器访问官方 HTTPS 源可以响应。Dockerfile 将官方源地址切换到 HTTPS 后，`docker build` 从当前源码完整成功，`ffmpeg`、`ffprobe` 安装完成。
 - 在不挂载仓库的独立镜像中，`from app.main import app` 成功、媒体工具可执行，`python -m pip check` 返回 `No broken requirements found`。这是当前本机 Colima 的默认镜像验证，不等于 Render 等目标环境构建或发布验收。
+- 本轮源码提交 `aa1731d` 的 [GitHub Actions 运行 40152940072](https://github.com/17-chen/videomind-ai/actions/runs/40152940072) 后端测试、Lint、隔离 hash 检索基线及前端构建、类型检查、Lint 均通过。
 
 ## 尚未验收
 
