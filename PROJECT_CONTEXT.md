@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-25。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-10-26。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 ## 项目基本信息
 
@@ -30,6 +30,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-10-26 补充：**API 视频任务入队日志现在关联请求编号与任务 ID；Worker 对领取、阶段、恢复和终态记录同一任务 ID。新增只读队列快照命令统计状态、最老排队时长、过期租约和最近一小时失败数。后端 94 项测试、Ruff 通过；命令在本机运行中的 PostgreSQL 上返回空队列及 0 个过期租约。未部署生产日志汇聚或告警，详见 [核查记录](docs/VERIFICATION_2026-10-26.md)。
 
 **2026-10-25 补充：**新增 API 请求编号和脱敏路由日志，关闭新启动实例的 Uvicorn 原始访问日志与 Loguru 局部变量诊断。后端 92 项测试及 Ruff 通过；前端升级 Next.js 16.4.3 后生产镜像、HTTP 页面烟测、typecheck/lint 通过。npm 审计已无 high/critical，Tailwind 3 构建链仍有 4 项 moderate。当前后端默认镜像改用 Debian 官方 HTTPS 源，在 Colima 从源码构建成功，独立镜像应用导入、媒体工具与 `pip check` 通过；云平台仍待验收。详见 [核查记录](docs/VERIFICATION_2026-10-25.md)。
 

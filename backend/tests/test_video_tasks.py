@@ -10,10 +10,12 @@ from app.api import dependencies
 from app.api.v1.routes import chat as chat_routes
 from app.api.dependencies import get_db
 from app.core.config import settings
+from app.core.logging import logger
 from app.database.base import Base
 from app.main import app
 from app.models import AiSettings, Embedding, RequestWindow, Summary, Transcript, User, Video, VideoTask  # noqa: F401
 from app.services import video_tasks
+from app.services.task_monitoring import task_queue_snapshot
 from app.services.rag import RagChatResult
 from app.services.auth import AuthIdentity
 
@@ -162,6 +164,55 @@ def test_worker_claim_and_resume_policy(task_api):
         assert task.status == "failed"
         assert "重复计费" in task.error
         assert video_tasks.claim_next_task(db, "worker-c") is None
+
+
+def test_task_logs_connect_api_request_to_worker_without_request_data(task_api, monkeypatch):
+    client, engine = task_api
+    video_id = create_video(client)
+    messages = []
+    sink = logger.add(lambda message: messages.append(str(message)), format="{message}")
+    try:
+        started = client.post(
+            f"/api/v1/videos/{video_id}/process?private=do-not-log",
+            headers={**auth("alice"), "Cookie": "secret-cookie"},
+        )
+        task_id = started.json()["task_id"]
+        request_id = started.headers["X-Request-ID"]
+        monkeypatch.setattr(video_tasks, "process_video", lambda *args, **kwargs: None)
+        with Session(engine) as db:
+            video_tasks.claim_next_task(db, "worker-a")
+            video_tasks.execute_claimed_task(db, task_id, "worker-a")
+        assert any(f"event=queued request_id={request_id} task_id={task_id}" in entry for entry in messages)
+        assert any(f"event=claimed task_id={task_id}" in entry for entry in messages)
+        assert any(f"event=stage_started task_id={task_id}" in entry for entry in messages)
+        assert any(f"event=succeeded task_id={task_id}" in entry for entry in messages)
+        assert all("do-not-log" not in entry and "secret-cookie" not in entry for entry in messages)
+    finally:
+        logger.remove(sink)
+
+
+def test_task_queue_snapshot_counts_stale_leases_and_recent_failures(task_api, monkeypatch):
+    client, engine = task_api
+    monkeypatch.setattr(settings, "max_active_video_tasks_per_user", 3)
+    first, second, third = [create_video(client) for _ in range(3)]
+    for video_id in (first, second, third):
+        assert client.post(f"/api/v1/videos/{video_id}/process", headers=auth("alice")).status_code == 202
+    now = datetime.now(UTC)
+    with Session(engine) as db:
+        running = video_tasks.claim_next_task(db, "worker-a")
+        running.lease_expires_at = now - timedelta(seconds=1)
+        failed = db.query(VideoTask).filter(VideoTask.video_id == second).one()
+        failed.status = "failed"
+        failed.finished_at = now - timedelta(minutes=10)
+        db.commit()
+        snapshot = task_queue_snapshot(db, now=now)
+    assert snapshot["queued"] == 1
+    assert snapshot["running"] == 1
+    assert snapshot["failed"] == 1
+    assert snapshot["expired_leases"] == 1
+    assert snapshot["failed_last_hour"] == 1
+    assert snapshot["oldest_queued_seconds"] >= 0
+    assert "alice" not in str(snapshot)
 
 
 def test_running_cancellation_is_owned_and_seen_by_worker(task_api, monkeypatch):

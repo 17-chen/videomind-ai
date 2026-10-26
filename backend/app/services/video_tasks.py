@@ -90,6 +90,8 @@ def cancel_video_task_for_user(db: Session, user: User, video_id: str) -> VideoT
         task.finished_at = datetime.now(UTC)
         task.video.status = VideoStatus.CANCELLED.value
     db.commit()
+    if task.status == "cancelled":
+        _log_task_event(task, "cancelled")
     db.refresh(task)
     return task
 
@@ -128,6 +130,8 @@ def recover_expired_tasks(db: Session) -> int:
             task.lease_expires_at = None
             task.video.status = VideoStatus.QUEUED.value
     db.commit()
+    for task in expired:
+        _log_task_event(task, "recovered")
     return len(expired)
 
 
@@ -151,6 +155,7 @@ def claim_next_task(db: Session, worker_id: str) -> VideoTask | None:
     task.video.status = VideoStatus.PROCESSING.value
     db.commit()
     db.refresh(task)
+    _log_task_event(task, "claimed")
     return task
 
 
@@ -207,9 +212,10 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         task.finished_at = datetime.now(UTC)
         task.lease_expires_at = None
         db.commit()
+        _log_task_event(task, "succeeded")
     except Exception as exc:
         db.rollback()
-        logger.error("Video task {} failed at {}: {}", task_id, task.stage, type(exc).__name__)
+        logger.error("Video task event=exception task_id={} stage={} error_type={}", task_id, task.stage, type(exc).__name__)
         task = db.get(VideoTask, task_id)
         if task is None:
             return
@@ -229,6 +235,7 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         if not task.video.processing_error:
             task.video.processing_error = task.error
         db.commit()
+        _log_task_event(task, "failed")
 
 
 def _set_stage(db: Session, task: VideoTask, worker_id: str, stage: str) -> bool:
@@ -248,6 +255,7 @@ def _set_stage(db: Session, task: VideoTask, worker_id: str, stage: str) -> bool
         return False
     db.commit()
     db.refresh(task)
+    _log_task_event(task, "stage_started")
     return True
 
 
@@ -268,7 +276,15 @@ def _stop_at_checkpoint(db: Session, task: VideoTask, worker_id: str, *, lock: b
     task.video.status = VideoStatus.CANCELLED.value
     task.video.processing_error = None
     db.commit()
+    _log_task_event(task, "cancelled")
     return True
+
+
+def _log_task_event(task: VideoTask, event: str) -> None:
+    logger.info(
+        "Video task event={} task_id={} kind={} status={} stage={} attempt={}",
+        event, task.id, task.kind, task.status, task.stage, task.attempts,
+    )
 
 
 def new_worker_id() -> str:

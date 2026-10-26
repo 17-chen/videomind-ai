@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
 from app.core.config import settings
 from app.core.i18n import t
 from app.core.errors import ApiError
+from app.core.logging import logger
 from app.models.user import User
 from app.schemas.video import VideoCreate, VideoListResponse, VideoNoteUpdate, VideoProcessResponse, VideoRead, VideoTaskRead, VideoUpdate
 from app.services.ai_settings import resolve_llm
@@ -163,12 +164,14 @@ def delete_video(
 )
 def process_video(
     video_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
     _reserve_video_task_request(db, current_user)
     video = get_video_for_user(db=db, user=current_user, video_id=video_id)
     task = enqueue_video_task(db, current_user, video, "process")
+    _log_task_admitted(request, task.id, "process")
     return VideoProcessResponse(id=video.id, status=video.status, message=t("video_processing_started"), task_id=task.id)
 
 
@@ -181,6 +184,7 @@ def process_video(
 )
 def run_video(
     video_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
@@ -189,6 +193,7 @@ def run_video(
     if video.summary is None:
         resolve_llm(current_user)
     task = enqueue_video_task(db, current_user, video, "run")
+    _log_task_admitted(request, task.id, "run")
     return VideoProcessResponse(id=video.id, status=video.status, message="任务已入队，页面会自动更新进度", task_id=task.id)
 
 
@@ -220,6 +225,7 @@ def cancel_video_task(
 )
 def analyze_video(
     video_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
@@ -229,6 +235,7 @@ def analyze_video(
         raise ApiError(t("transcript_required"), status.HTTP_400_BAD_REQUEST)
     resolve_llm(current_user)
     task = enqueue_video_task(db, current_user, video, "analyze")
+    _log_task_admitted(request, task.id, "analyze")
     return VideoProcessResponse(id=video.id, status=video.status, message="AI 分析任务已入队", task_id=task.id)
 
 
@@ -241,6 +248,7 @@ def analyze_video(
 )
 def embed_video(
     video_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> VideoProcessResponse:
@@ -249,6 +257,7 @@ def embed_video(
     if not build_video_document(video).strip():
         raise ApiError(t("embedding_source_required"), status.HTTP_400_BAD_REQUEST)
     task = enqueue_video_task(db, current_user, video, "embed")
+    _log_task_admitted(request, task.id, "embed")
     return VideoProcessResponse(id=video.id, status=video.status, message="知识库写入任务已入队", task_id=task.id)
 
 
@@ -256,3 +265,7 @@ def _reserve_video_task_request(db: Session, user: User) -> None:
     lock_user_for_limits(db, user.id)
     consume_request(db, user.id, "video_task", settings.max_video_task_requests_per_minute)
     db.commit()
+
+
+def _log_task_admitted(request: Request, task_id: str, kind: str) -> None:
+    logger.info("Video task event=queued request_id={} task_id={} kind={}", request.state.request_id, task_id, kind)
