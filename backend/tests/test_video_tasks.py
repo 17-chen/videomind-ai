@@ -201,7 +201,7 @@ def test_task_queue_snapshot_counts_stale_leases_and_recent_failures(task_api, m
     with Session(engine) as db:
         running = video_tasks.claim_next_task(db, "worker-a")
         running.lease_expires_at = now - timedelta(seconds=1)
-        failed = db.query(VideoTask).filter(VideoTask.video_id == second).one()
+        failed = db.query(VideoTask).filter(VideoTask.video_id != running.video_id).first()
         failed.status = "failed"
         failed.finished_at = now - timedelta(minutes=10)
         db.commit()

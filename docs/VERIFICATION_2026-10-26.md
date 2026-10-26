@@ -10,6 +10,7 @@
 - 本地 Colima 已有后端容器：`python -m pytest -q` 为 **94 passed、1 个既有 LangGraph 待弃用提示**；`ruff check app tests scripts` 通过。
 - 定向测试核对 HTTP 请求编号与任务 ID、Worker 领取/阶段/成功日志的关联，并使用敏感查询和 Cookie 确认日志不包含其内容。另一测试核对排队、运行、失败计数及过期租约、最近一小时失败数。这些是模拟任务与 SQLite 测试，不是外部服务验收。
 - 在本地运行中的 PostgreSQL 执行队列命令成功：`queued=0`、`running=0`、`expired_leases=0`、`failed_last_hour=0`。这是当时的只读快照，不代表持续监测或长期稳定性。
+- 首次推送的 [CI 运行 40260140183](https://github.com/17-chen/videomind-ai/actions/runs/40260140183) 前端通过，后端在新增快照测试失败：三个任务创建时间接近，领取顺序还按任务 ID 排序，测试错误地假定首个创建的视频一定被领取。测试改为从实际领取结果挑选另一个任务标为失败；本机完整后端测试与 Ruff 复测通过，业务队列代码无需改动。
 
 ## 待验收
 
