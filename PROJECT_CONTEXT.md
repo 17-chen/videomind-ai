@@ -2,6 +2,8 @@
 
 > 最后核对：2026-10-27。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
+**文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
+
 ## 项目基本信息
 
 - **名称：**VideoMind AI。

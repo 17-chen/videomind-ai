@@ -1,430 +1,237 @@
 # VideoMind AI
 
-VideoMind AI 是一个 AI 视频知识管理平台，目标是把“收藏但没时间看的视频”自动转化为可搜索、可回顾、可对话的个人知识资产。
+**Turn saved videos into structured notes and a searchable personal knowledge library.**
 
-项目核心流程：
+**English** · [简体中文](README.zh-CN.md)
 
-```text
-视频 URL 或本地上传
--> 下载并获取字幕；无字幕时按 ASR 配置转写（当前默认关闭）
--> 使用 LLM 理解视频内容
--> 生成结构化 Markdown 笔记
--> 存入个人视频知识库
--> 基于 RAG 实现 Chat With My Videos
+[![CI](https://github.com/17-chen/videomind-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/17-chen/videomind-ai/actions/workflows/ci.yml)
+![Next.js](https://img.shields.io/badge/Next.js-16-111827?logo=nextdotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.12-009688?logo=fastapi&logoColor=white)
+![Storage](https://img.shields.io/badge/Data-PostgreSQL_%2B_Chroma-4169E1)
+![Stage](https://img.shields.io/badge/Stage-Local_development-F59E0B)
+
+[Quick start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Project status](#project-status) · [Developer guide](#development-and-checks)
+
+Save a video URL or upload a file, extract its subtitles or transcript, generate Markdown notes, and search your library through retrieval-augmented generation (RAG). Answers return video sources so you can revisit the material behind a response.
+
+The application has a **Chinese/English interface**, a Next.js frontend, and a FastAPI backend. PostgreSQL stores library data and durable jobs; a separate Worker performs the video-processing stages.
+
+> [!NOTE]
+> This is an actively developed local application, not a production-ready hosted SaaS. The default demo account is shared, ASR is disabled by default, and `local_hash` embeddings are intended for workflow testing. Real Supabase users, paid-provider analysis/Q&A, and the complete real-video workflow still require acceptance testing.
+
+## Features
+
+| Capability | What is implemented |
+| --- | --- |
+| Video library | URL intake and local uploads; search, pagination, tags, and per-user categories |
+| Transcription | Subtitle-first processing, audio extraction, optional local faster-whisper or the user's OpenAI transcription configuration |
+| Structured notes | LangGraph analysis, summaries, editable Markdown, and index synchronization/retry |
+| Chat with videos | User-filtered Chroma retrieval and source-linked answers using a configured LLM |
+| Durable tasks | PostgreSQL queue, independent Worker, lease/heartbeat recovery, stage-boundary cancellation, and reuse of completed stages |
+| Personal AI settings | DeepSeek/OpenAI configuration and encrypted user API keys; authenticated requests never fall back to the owner's key |
+| Development operations | Readiness checks, request/task correlation, read-only queue snapshots, retrieval evaluation, and a recovery runbook |
+
+These are implemented capabilities, not a claim that every external integration has passed real-service validation. See [project status](#project-status) for evidence.
+
+## From video to knowledge
+
+```mermaid
+flowchart LR
+    INPUT["Video URL / local upload"] --> TEXT["Subtitles or configured ASR"]
+    TEXT --> NOTES["LLM analysis + Markdown notes"]
+    NOTES --> INDEX["Embeddings + personal library"]
+    QUERY["Your question"] --> RETRIEVE["User-filtered retrieval"]
+    INDEX --> RETRIEVE
+    RETRIEVE --> ANSWER["Answer + video sources"]
+    classDef input fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef ai fill:#EDE9FE,stroke:#7C3AED,color:#4C1D95
+    classDef data fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef output fill:#FFF7ED,stroke:#EA580C,color:#7C2D12
+    class INPUT,QUERY input
+    class TEXT,NOTES ai
+    class INDEX,RETRIEVE data
+    class ANSWER output
 ```
 
-> 项目资料建议先读：[文档入口](docs/PROJECT_MATERIALS.md) · [当前状态](PROJECT_CONTEXT.md) · [项目交接](PROJECT_HANDOFF.md) · [阶段路线图](docs/roadmap.md)。以下 README 中早期阶段描述以这些当前核对文档为准。
+## Architecture
 
-## 当前阶段
-
-当前完成：
-
-- **Phase 1：项目初始化**
-- **Phase 2：Backend 基础 API**
-- **Phase 3：视频处理 Pipeline 基础实现**
-- **Phase 4：AI 视频分析 Agent 基础实现**
-- **Phase 5：RAG 问答基础实现**
-- **Phase 6：前端 UI 基础实现**
-- **Phase 7：本地生产化基础已实现，真实视频闭环待验收**
-- **Sprint 02：Supabase 用户系统代码已提交，真实项目运行验收待做**
-
-已完成内容：
-
-- 使用 monorepo 组织前端、后端、文档和本地存储目录。
-- 前端使用 Next.js 16.4.3、React 19、TypeScript 和 Tailwind CSS。
-- 后端规划为 Python FastAPI、SQLAlchemy、PostgreSQL。
-- 使用 Docker Compose 管理 PostgreSQL、Adminer 和应用服务；本地 Chroma 默认嵌入后端，独立服务按需启用。
-- 实现 URL 视频下载、字幕优先解析和音频提取；ASR 默认为关闭，可选安装本地 faster-whisper。
-- 实现 DeepSeek 视频分析 Agent、Markdown 笔记生成、ChromaDB 写入和 Chat With My Videos API。
-- 实现中文优先的 Next.js 前端：工作台、知识库、视频详情、视频问答和快速添加入口。
-- 提供 `.env.example` 作为环境变量模板。
-- 提供后端和前端 Dockerfile。
-- 提供架构文档和 API 规划文档。
-- 预留视频、音频、转写文本、笔记和临时文件目录。
-
-视频详情可一键处理字幕、生成 AI 笔记并写入知识库，也可分别执行各阶段；失败后的一键重试复用已完成阶段。此流程目前由 PostgreSQL 持久任务和独立 Worker 执行，真实视频与服务商调用尚未验收。
-
-知识库每页展示 20 条视频，翻页保留搜索和分类；关键词可匹配原始标题、描述、链接以及 AI 生成的标题和摘要。分类快捷入口覆盖当前用户的全部视频，没有匹配结果时可清除筛选。
-
-本地 ASR 和中文向量模型现已有可选接入，后者支持长文档分段；安装与切换步骤见 [本地 AI 配置](docs/LOCAL_AI.md)。真实模型与检索质量仍待验收。后续阶段会继续做真实模型与多用户联调。
-
-现已提供[固定中文检索评测](docs/RETRIEVAL_EVALUATION.md)，可在独立内存向量库中比较模型、记录逐题结果和用户隔离，默认无需模型密钥。[剩余交付范围与工时](docs/COMPLETION_PLAN.md)列出本地收束和多用户上线的后续工作。
-
-## 项目结构
-
-```text
-videomind-ai/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   └── v1/
-│   │   ├── agents/
-│   │   ├── core/
-│   │   ├── database/
-│   │   ├── models/
-│   │   ├── prompts/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   └── utils/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   ├── public/
-│   ├── styles/
-│   ├── Dockerfile
-│   └── package.json
-├── docs/
-│   ├── api.md
-│   └── architecture.md
-├── scripts/
-├── storage/
-│   ├── audio/
-│   ├── notes/
-│   ├── tmp/
-│   ├── transcripts/
-│   └── videos/
-├── docker-compose.yml
-├── .env.example
-└── .gitignore
+```mermaid
+flowchart TD
+    WEB["Next.js / React / TypeScript"] --> API["FastAPI + SQLAlchemy"]
+    AUTH["Supabase Auth - optional mode"] -. "Token verification" .-> API
+    API --> DB[("PostgreSQL: users, videos, jobs")]
+    DB <--> WORKER["Independent video Worker"]
+    WORKER --> MEDIA["yt-dlp / FFmpeg / ASR"]
+    WORKER --> LLM["LangGraph + user-configured LLM"]
+    WORKER --> VECTOR[("Chroma: embedded by default")]
+    API --> VECTOR
+    WORKER --> FILES["Local media + notes storage"]
+    classDef web fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A
+    classDef service fill:#EDE9FE,stroke:#7C3AED,color:#4C1D95
+    classDef data fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    class WEB,AUTH web
+    class API,WORKER,MEDIA,LLM service
+    class DB,VECTOR,FILES data
 ```
 
-## 当前技术栈
+Jobs survive API restarts. Cancellation takes effect between stages, not during an external call. Operations that may already have incurred provider charges are not blindly repeated after an uncertain interruption. Embedded Chroma and local files remain a local-development setup; production persistence is unfinished.
 
-### Frontend
+## Quick start
 
-- Next.js 16.4.3
-- React 19
-- TypeScript
-- Tailwind CSS 与项目内 UI 组件
+### 1. Start the local application
 
-### Backend
-
-- Python 3.12+
-- FastAPI
-- SQLAlchemy
-- PostgreSQL
-- Alembic
-- LangGraph
-
-### AI / Data
-
-- DeepSeek API
-- 可插拔 ASR，默认关闭；可选本地 faster-whisper
-- 默认本地 hash embedding；可选中文 BGE 向量模型
-- ChromaDB
-- 后续可扩展 Gemini、Claude、Pinecone
-
-## 本地运行准备
-
-请先安装：
-
-- Docker Desktop
-- Docker Compose v2
-- Node.js 20+，用于后续前端本地开发
-- Python 3.12+，用于后续后端本地开发
-
-复制环境变量文件：
+Install Git and a working **Docker Engine with Compose v2**. Docker Desktop or configured Colima can be used. Host Node.js/Python installations are only needed for development outside containers.
 
 ```bash
+git clone https://github.com/17-chen/videomind-ai.git
+cd videomind-ai
 cp .env.example .env
+docker compose --profile app up -d --build
+docker compose ps
 ```
 
-### 用户认证模式
+This starts the application profile, including the backend, frontend, and **Worker**, plus PostgreSQL and Adminer. Backend startup applies the supplied migration flow. The default vector store is embedded; no separate Chroma container is required.
 
-本地默认使用演示用户，不需要注册即可开发：
+| Local service | Default address |
+| --- | --- |
+| Web application | `http://localhost:3000` |
+| API documentation | `http://localhost:8000/docs` |
+| Readiness | `http://localhost:8000/api/v1/health/ready` |
+| Adminer | `http://localhost:8080` |
 
-```env
-AUTH_MODE=demo
-```
+If port 8000 is occupied, set **both** `API_PORT=8001` and `NEXT_PUBLIC_API_BASE_URL=http://localhost:8001/api/v1` in your private `.env`, then recreate the application services. Keep `INTERNAL_API_BASE_URL=http://backend:8000/api/v1` for container-to-container access.
 
-接入 Supabase 后，在 `.env` 填写以下配置并重启前后端：
+### 2. Understand the defaults
 
-```env
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `AUTH_MODE` | `demo` | Visits share a development account; personal key writes are rejected |
+| `ASR_PROVIDER` | `disabled` | Subtitles are preferred; subtitle-free videos need enabled ASR |
+| `EMBEDDING_PROVIDER` | `local_hash` | Deterministic workflow vectors, not a semantic-quality benchmark |
+| `CHROMA_MODE` | `embedded` | Vectors persist under `storage/chroma/` |
+| `INSTALL_LOCAL_AI` | `false` | Large optional model dependencies are excluded from the default image |
+
+You can inspect the interface in demo mode without a model key. AI notes and answers need an appropriate model configuration; cloning this repository does not provide inference credits.
+
+### 3. Configure accounts and personal model keys
+
+For a personal-user setup, configure a Supabase project in `.env`:
+
+```dotenv
 AUTH_MODE=supabase
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+USER_API_KEY_ENCRYPTION_KEY=your-persistent-fernet-key
 ```
 
-后端使用 `SUPABASE_URL` 和 `SUPABASE_ANON_KEY` 向 Supabase Auth 验证用户令牌；前端使用 `NEXT_PUBLIC_` 变量。两侧必须指向同一个项目。登录和注册页面位于 `http://localhost:3000/auth`。
-
-## Docker 命令说明
-
-启动 Phase 1 的基础设施：
+Generate a Fernet key once, keep it private, and retain it with backups. After building the backend image, for example:
 
 ```bash
-docker compose up -d postgres adminer
+docker compose run --rm --no-deps backend python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-这条命令的意思是：
+Save the result in your private `.env`; do not commit it or regenerate it over an existing key. Recreate frontend/backend/Worker services after configuration changes. Sign in at `/auth`, then configure your own DeepSeek or OpenAI model/API key at `/settings`. The optional OpenAI transcription key is configured separately. Provider usage is billed to the key owner.
 
-- `docker compose`：读取当前目录下的 `docker-compose.yml`。
-- `up`：创建并启动服务。
-- `-d`：后台运行，也叫 detached mode，所以终端不会一直打印日志。
-- `postgres adminer`：启动数据库和管理界面；本地向量库默认嵌入后端并持久化到 `storage/chroma/`，无需单独启动 Chroma 容器。
+Frontend and backend must use the same Supabase project. This path has implementation and automated coverage, but real two-user acceptance is still pending. See the [recovery runbook (中文)](docs/RECOVERY_RUNBOOK.md) before handling stored encrypted keys.
 
-如果你运行后“没有反应”，通常有几种情况：
+### 4. Enable optional local AI
 
-1. **正常情况：服务已经在后台启动**
+For subtitle-free transcription and Chinese semantic embeddings, set these in your private `.env`:
 
-   因为用了 `-d`，Docker 会在后台运行容器。可以用下面命令查看：
+```dotenv
+INSTALL_LOCAL_AI=true
+ASR_PROVIDER=faster_whisper
+LOCAL_WHISPER_MODEL=base
+LOCAL_WHISPER_DEVICE=cpu
+LOCAL_WHISPER_COMPUTE_TYPE=int8
+EMBEDDING_PROVIDER=bge_zh
+EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
+```
 
-   ```bash
-   docker compose ps
-   ```
-
-2. **Docker Desktop 没有启动**
-
-   请先打开 Docker Desktop，等它显示 Docker Engine 已运行，再重新执行命令。
-
-3. **当前目录不对**
-
-   需要先进入项目根目录：
-
-   ```bash
-   cd "/Users/chenxin/Documents/Codex 2/videomind-ai"
-   ```
-
-4. **想看实时日志**
-
-   不加 `-d` 就会在终端显示启动日志：
-
-   ```bash
-   docker compose up postgres chroma adminer
-   ```
-
-5. **想查看后台日志**
-
-   ```bash
-   docker compose logs -f
-   ```
-
-服务启动后可以访问：
-
-- PostgreSQL: `localhost:5432`
-- VideoMind API: `http://localhost:${API_PORT:-8000}`；本机若将 `API_PORT` 设为 `8001`，API 在 `http://localhost:8001`。嵌入式 Chroma 没有独立 HTTP 地址。
-- Adminer: `http://localhost:8080`
-
-如果 `localhost:8000` 已被其他程序占用，在本地 `.env` 中同时设置 `API_PORT=8001` 与 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8001/api/v1`，然后重建 backend 和 frontend；`INTERNAL_API_BASE_URL` 仍指向容器内 `backend:8000`。下面的命令示例使用默认 8000 端口，本机覆盖端口时相应改为 8001。
-
-停止服务：
+Rebuild the backend image and recreate the Worker that uses it:
 
 ```bash
-docker compose down
+docker compose --profile app up -d --build backend
+docker compose --profile app up -d --no-deps --force-recreate worker
 ```
 
-停止服务并删除本地数据库 / 向量库数据卷：
+First use downloads models. Local ASR/embeddings consume compute and disk; note generation and Q&A still use your configured LLM. Switching embedding models requires explicitly rebuilding existing indexes. Start with a read-only preview:
 
 ```bash
-docker compose down -v
+docker compose exec backend python -m scripts.reindex_vectors --dry-run
 ```
 
-## 初始开发路线图
+See the [local AI guide (中文)](docs/LOCAL_AI.md) for model isolation, index rebuilding, and compatibility limits.
 
-下列内容是早期规划；当前验收状态请以 [阶段路线图](docs/roadmap.md) 为准。
+## Use the application
 
-1. **Phase 1：项目初始化**
-   - 项目目录设计
-   - Docker 配置
-   - 环境变量模板
-   - README 和架构文档
+1. Open `/library` to save a URL or upload a video.
+2. In its detail page, start the complete workflow or run processing, analysis, and indexing separately.
+3. Keep the Worker running. HTTP `202` means **queued**, not completed; the page shows task stages and cancellation status.
+4. Review/edit Markdown notes, then use `/chat` to ask about indexed material and revisit the returned video sources.
+5. Switch the interface with the Chinese/English control. Prompts and generated content have their own language behavior; changing the UI does not translate stored videos or notes.
 
-2. **Phase 2：Backend 开发**
-   - FastAPI 应用入口
-   - PostgreSQL 连接
-   - SQLAlchemy 模型
-   - `/videos` API
+Downloads depend on source-site access rules, network, subtitles, and yt-dlp support. Use media you are authorized to process.
 
-3. **Phase 3：视频处理 Pipeline**
-   - 视频链接解析
-   - 视频下载
-   - 音频提取
-   - 字幕获取
-   - Whisper ASR
+## Project status
 
-4. **Phase 4：AI Agent**
-   - Video Analysis Agent
-   - Prompt 工程
-   - JSON 结构化分析输出
-   - Markdown 笔记生成
+Evidence snapshot: **2026-10-27**. A narrow smoke test is not full product acceptance.
 
-5. **Phase 5：RAG 系统**
-   - Embedding 生成
-   - ChromaDB 向量存储
-   - 语义检索
-   - Chat With My Videos
+| Area | Evidence and remaining work |
+| --- | --- |
+| Automated checks | The [2026-10-27 record](docs/VERIFICATION_2026-10-27.md) reports 96 backend tests, Ruff, and passing backend/frontend CI. These are prior results, not tests rerun by this documentation update. |
+| Real media/local ASR | An isolated NASA public-video download/transcription path has run through a real Worker; the full real-provider notes/index/Q&A chain is still awaiting validation. |
+| Retrieval quality | Synthetic fixtures and a small NASA English corpus have been evaluated. Recorded BGE Recall@2 on the public-video text set was 72.73%, with known misses; this does not establish Chinese or answer-generation quality. |
+| Accounts/user keys | Supabase/BYOK code and automated checks exist; real two-user login/isolation, paid calls, and recovery from real saved ciphertext still need validation. |
+| Deployment | Local production-image checks exist. Public hosting, cloud persistence, full storage quotas, production alerting, and long-running multi-instance operation are unfinished. |
 
-6. **Phase 6：Frontend**
-   - Landing Page
-   - Dashboard
-   - Library Page
-   - Video Detail Page
-   - Chat Page
-   - 响应式 SaaS UI
+See [retrieval evaluation (中文)](docs/RETRIEVAL_EVALUATION.md), [current context (中文)](PROJECT_CONTEXT.md), and the [delivery plan (中文)](docs/COMPLETION_PLAN.md) for evidence and open tasks.
 
-## 环境变量说明
+## Development and checks
 
-项目默认使用 DeepSeek 作为 LLM Provider。`DEEPSEEK_API_KEY` 在 `.env.example` 中故意留空，Phase 4 运行 AI 视频分析前，需要在 `.env` 中填入自己的 DeepSeek API Key。
-
-`DATABASE_URL` 默认使用 Docker Compose 内部服务名 `postgres`。如果你在宿主机直接运行后端，可以改成：
-
-```text
-postgresql+psycopg://videomind:videomind_dev_password@localhost:5432/videomind
-```
-
-## 文档
-
-- [架构设计](docs/architecture.md)
-- [API 规划](docs/api.md)
-- [项目书](docs/project-plan.md)
-- [当前自查记录](docs/self-review.md)
-- [分阶段任务路线图](docs/roadmap.md)
-- [部署审计报告](docs/deployment-audit.md)
-
-## 数据库迁移
-
-新环境使用 Alembic 创建和升级数据库结构：
+The project keeps **Next.js + FastAPI + SQLAlchemy**. For host frontend development use Node.js 22 (matching CI); the backend targets Python 3.12.
 
 ```bash
-cd backend
-alembic upgrade head
+# Backend checks in the running container
+docker compose exec backend python -m pytest -q
+docker compose exec backend ruff check app tests scripts
+docker compose exec backend python -m scripts.evaluate_retrieval
+
+# Read-only queue snapshot
+docker compose exec backend python -m scripts.task_queue_status
 ```
 
-本地开发默认保留 `AUTO_CREATE_DATABASE_TABLES=true`，方便首次启动。生产环境必须设置为 `false`，并在应用启动前执行 `alembic upgrade head`。
-
-如果本地数据库已经由旧版本自动建表且结构与当前模型一致，可以先备份数据，再执行：
-
-```bash
-cd backend
-alembic stamp head
-```
-
-FastAPI 的 OpenAPI 文档会在 Phase 2 后端启动后开放：
-
-```text
-http://localhost:8000/docs
-```
-
-## Phase 2 后端接口
-
-Phase 2 已实现：
-
-- `GET /health`
-- `GET /api/v1/health`
-- `POST /api/v1/videos`
-- `GET /api/v1/videos`
-- `GET /api/v1/videos/{id}`
-- `POST /api/v1/videos/{id}/process`
-- `POST /api/v1/videos/{id}/analyze`
-- `POST /api/v1/videos/{id}/embed`
-- `POST /api/v1/chat`
-
-当前默认使用 demo user；Supabase 认证代码正在接入，真实配置和多用户隔离尚待验收。
-
-启动完整后端服务：
-
-```bash
-docker compose --profile app up -d postgres chroma adminer backend
-```
-
-Phase 4 的 AI 分析需要配置：
-
-```text
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
-```
-
-默认配置：
-
-```text
-LLM_PROVIDER=deepseek
-LLM_BASE_URL=https://api.deepseek.com
-LLM_MODEL=deepseek-flash
-EMBEDDING_PROVIDER=local_hash
-```
-
-说明：DeepSeek 不提供 Whisper 风格的音频转写 API。当前默认 `ASR_PROVIDER=disabled`，系统会优先使用视频字幕；没有字幕的视频暂时不会调用 OpenAI Whisper。
-
-提交并处理一个视频的流程：
-
-```bash
-curl -X POST http://localhost:8000/api/v1/videos \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://www.bilibili.com/video/...","tags":["AI Agent"]}'
-```
-
-然后把返回结果里的 `id` 用于触发处理：
-
-```bash
-curl -X POST http://localhost:8000/api/v1/videos/{id}/process
-```
-
-视频完成转写和分析后，写入向量知识库：
-
-```bash
-curl -X POST http://localhost:8000/api/v1/videos/{id}/embed
-```
-
-向个人视频知识库提问：
-
-```bash
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question":"我之前收藏过哪些关于 AI Agent 创业的视频？","limit":5}'
-```
-
-## Phase 6 前端运行
-
-进入前端目录安装依赖：
+For a separate frontend development checkout:
 
 ```bash
 cd frontend
-npm install
-```
-
-启动本地前端：
-
-```bash
+npm ci
 npm run dev
 ```
 
-访问：
+In an isolated frontend copy, run `npm run build`, `npm run typecheck`, and `npm run lint`. Avoid production builds in a running development server's directory; see [AGENTS.md](AGENTS.md) and the [handoff (中文)](PROJECT_HANDOFF.md).
 
-```text
-http://localhost:3000
-```
+Stop the stack with `docker compose --profile app down`. Preserve the PostgreSQL volume, `storage/`, and encryption key when retaining data. Do not delete volumes as a reset shortcut.
 
-已实现页面：
+## Repository map and documentation
 
-- `/`：首页和快速添加视频
-- `/dashboard`：工作台
-- `/library`：视频知识库
-- `/videos/{id}`：视频详情、处理、分析、写入知识库
-- `/chat`：视频知识库问答
+| Path | Purpose |
+| --- | --- |
+| [`frontend/`](frontend/) | Next.js pages, bilingual UI, API clients, and settings |
+| [`backend/app/`](backend/app/) | FastAPI, agents, services, models, and contracts |
+| [`backend/alembic/`](backend/alembic/) | Database migrations |
+| [`backend/scripts/`](backend/scripts/) | Worker, evaluation, index and recovery utilities |
+| [`backend/tests/`](backend/tests/) · [`backend/evals/`](backend/evals/) | Tests, fixed corpora, and evaluation reports |
+| `storage/` | Runtime media, notes, vectors, and model cache; not public project data |
+| [`docs/`](docs/) | Architecture, dated verification, recovery, and delivery plans |
 
-质量检查：
+- [中文首页](README.zh-CN.md)
+- [Project document index (中文)](docs/PROJECT_MATERIALS.md)
+- [Architecture (中文)](docs/architecture.md)
+- [Recovery runbook (中文)](docs/RECOVERY_RUNBOOK.md)
+- [Changelog](CHANGELOG.md) · [Open tasks (中文)](TODO.md)
+- [Previous README, historical reference (中文)](docs/archive/README.before-bilingual.zh-CN.md)
 
-```bash
-npm run typecheck
-npm run build
-```
-
-## GitHub 状态
-
-本地仓库已实现前后端基础功能和 Phase 7 生产化基础，真实视频端到端流程与 Supabase 用户系统尚待验收。最新 Git 和运行状态见 [项目上下文](PROJECT_CONTEXT.md)。
-
-## 用户语言与自带模型密钥（2026-10-08）
-
-网站右上角可切换中文和英文；`/settings` 为产品设置页。截图中的英文 Preferences 属于 Next.js 开发工具，已通过 `devIndicators: false` 从本地预览隐藏。
-
-登录用户可以在 `/settings` 选择 DeepSeek 或 OpenAI、自填 Chat Completions 模型名和 API Key，并可另填 OpenAI 音频转写 Key。后端把密钥用 `USER_API_KEY_ENCRYPTION_KEY` 加密后存入 PostgreSQL；读取接口只返回是否已设置，密钥不会回传浏览器。分析、视频问答和缺字幕时的转写按当前用户的配置调用服务商，费用由用户在各自的服务商账户承担。已认证用户没有密钥时会得到设置提示，不会使用项目所有者的 `.env` Key。服务商地址由后端固定，用户不能填写任意 URL。
-
-生成一次 Fernet Key 并保存在未提交的 `.env` 中；之后不要直接轮换或丢失，否则已保存的用户密钥无法解密。只读解密检查命令和隔离恢复步骤见 [本地恢复手册](docs/RECOVERY_RUNBOOK.md)；空库检查不能证明密钥正确。生产环境需要先配置 `AUTH_MODE=supabase`、两端 Supabase 环境变量，再执行 Alembic 迁移。当前本地 `demo` 模式所有访问者共用同一演示账户，设置页只供预览，API 拒绝保存个人密钥；不要作为开放注册服务使用。真实 Supabase 双用户登录、服务商真实计费与视频全链路仍待验收。
-
-## 本地向量库（2026-10-08）
-
-默认 `CHROMA_MODE=embedded`，后端使用 Chroma PersistentClient，数据保存在已挂载的 `storage/chroma/`，不用拉取单独的 Chroma 镜像。`/api/v1/health/ready` 同时检查 PostgreSQL 和向量库。需要独立服务时，在 `.env` 设置 `CHROMA_MODE=http` 并运行 `docker compose --profile remote-chroma up -d chroma`；生产环境应使用服务端向量库和持久卷。嵌入式模式只面向本地单实例开发。
+The overview is maintained in English and Chinese. Deeper engineering records are currently primarily Chinese and are labeled accordingly. Bug reports and documentation improvements in either language are welcome.
