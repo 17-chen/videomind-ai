@@ -423,7 +423,7 @@ npm run build
 
 登录用户可以在 `/settings` 选择 DeepSeek 或 OpenAI、自填 Chat Completions 模型名和 API Key，并可另填 OpenAI 音频转写 Key。后端把密钥用 `USER_API_KEY_ENCRYPTION_KEY` 加密后存入 PostgreSQL；读取接口只返回是否已设置，密钥不会回传浏览器。分析、视频问答和缺字幕时的转写按当前用户的配置调用服务商，费用由用户在各自的服务商账户承担。已认证用户没有密钥时会得到设置提示，不会使用项目所有者的 `.env` Key。服务商地址由后端固定，用户不能填写任意 URL。
 
-生成一次 Fernet Key 并保存在未提交的 `.env` 中；之后不要轮换或丢失，否则已保存的用户密钥无法解密。生产环境需要先配置 `AUTH_MODE=supabase`、两端 Supabase 环境变量，再执行 Alembic 迁移。当前本地 `demo` 模式所有访问者共用同一演示账户，设置页只供预览，API 拒绝保存个人密钥；不要作为开放注册服务使用。真实 Supabase 双用户登录、服务商真实计费与视频全链路仍待验收。
+生成一次 Fernet Key 并保存在未提交的 `.env` 中；之后不要直接轮换或丢失，否则已保存的用户密钥无法解密。只读解密检查命令和隔离恢复步骤见 [本地恢复手册](docs/RECOVERY_RUNBOOK.md)；空库检查不能证明密钥正确。生产环境需要先配置 `AUTH_MODE=supabase`、两端 Supabase 环境变量，再执行 Alembic 迁移。当前本地 `demo` 模式所有访问者共用同一演示账户，设置页只供预览，API 拒绝保存个人密钥；不要作为开放注册服务使用。真实 Supabase 双用户登录、服务商真实计费与视频全链路仍待验收。
 
 ## 本地向量库（2026-10-08）
 

@@ -1,6 +1,6 @@
 # VideoMind AI 完整交接文档
 
-> 更新：2026-10-26。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
+> 更新：2026-10-27。供新聊天或新开发者直接接手；这份文件描述当前状态，早期逐日过程请查 CHANGELOG 与有日期的验证记录。文档不含真实密钥。
 
 ## 1. 先读摘要
 
@@ -9,12 +9,12 @@
 - **真实仓库：**`/Users/chenxin/Documents/Codex 2/videomind-ai`。
 - **GitHub：**`https://github.com/17-chen/videomind-ai`；remote 为 `git@github.com:17-chen/videomind-ai.git`，主分支 `main`。
 - **最近功能基线：**2026-10-21 增加 PostgreSQL 视频任务、独立 Worker 和 `20261021_0007` 迁移；2026-10-22 补了本地 AI 兼容性与真实公开视频处理验收。恢复时以实际 Git 为准。
-- **2026-10-24 开工前：**工作树干净，本地 `main` 与 `origin/main` 一致，提交 `e7e6a85`；完成时再次核对实际 Git 状态。
-- **最新后端证据：**2026-10-26，后端 94 项测试及 Ruff 通过；API 入队到 Worker 阶段的任务 ID 关联与只读队列快照已在本地验证，见 [核查记录](docs/VERIFICATION_2026-10-26.md)。2026-10-25 的默认镜像构建与前端验证见 [前日记录](docs/VERIFICATION_2026-10-25.md)。
+- **2026-10-27 开工前：**本地 `main` 与 `origin/main` 一致，提交 `40d4acd`；工作区原有未跟踪 `outputs/`，与本项目开发无关，保留不动。
+- **最新后端证据：**2026-10-27，增加用户加密密钥只读恢复预检；后端 96 项测试与 Ruff 通过。本机数据库 0 条用户密文，结果为 `inconclusive`，不代表真实密钥恢复通过，见 [核查记录](docs/VERIFICATION_2026-10-27.md)。
 - **最新前端证据：**2026-10-25，Next.js 16.4.3 生产镜像构建、`/auth` HTTP 200、typecheck、lint 通过；npm 审计剩 4 项 moderate，0 high/critical。
 - **自动检查：**2026-10-26 [GitHub Actions 运行 40260336378](https://github.com/17-chen/videomind-ai/actions/runs/40260336378) 后端测试、Ruff、隔离检索基线及前端构建、类型检查、Lint 均通过。R9 仅自动检查和本机镜像核查子项有证据。
 - **2026-10-22 本地模型证据：**独立镜像的可选依赖与 `pip check` 通过；faster-whisper base 已转写合成中文音频及一个 NASA 真实公开视频。后者的 URL 下载、本地上传、无字幕缺 Key 失败路径在隔离数据库通过；真实 BGE 在固定虚构语料上完成隔离检索，详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
-- **下一步：**R1 补中文自然语音与跨主题样本、核对回答引用；R2 完成真实分析/问答；R8 补下载及生成文件的存储总量、匿名流量和生产日志汇聚/告警，R5 继续真实媒体故障与多实例长期运行验收。
+- **下一步：**R1 补中文自然语音与跨主题样本、核对回答引用；R2 完成真实分析/问答；R8 补下载及生成文件的存储总量、匿名流量、生产日志汇聚/告警和真实备份恢复演练，R5 继续真实媒体故障与多实例长期运行验收。
 - **本轮未完成的验收：**中文自然语音质量、真实笔记/向量/问答、Supabase/服务商调用和多实例运行仍待验证；英文公开视频的 72.73% Recall@2 也不是完整服务质量验收。
 
 先读本文件，再读 [剩余工作](docs/COMPLETION_PLAN.md)、[项目上下文](PROJECT_CONTEXT.md)、[TODO](TODO.md)。详细索引见 [项目资料](docs/PROJECT_MATERIALS.md)；新聊天开场文字见 [恢复说明](docs/NEW_CHAT_START.md)。
@@ -75,6 +75,7 @@
 - **密钥归属：**Supabase 模式按当前用户读取模型配置。demo 访问共用演示用户，因此禁止保存个人 Key，不能直接开放成多用户站点。
 - **认证映射：**只按 Supabase subject 映射本地用户；已有邮箱冲突拒绝自动合并，避免接管 demo 或其他账号资料。
 - **加密主密钥：**`USER_API_KEY_ENCRYPTION_KEY` 保存在未提交环境中。不能为排错随意覆盖或重新生成，否则已有加密 Key 无法读取。
+- **恢复预检：**`docker compose exec -T backend python -m scripts.verify_key_recovery` 只读检查现有用户密文能否由当前主密钥解开；备份密钥可在隔离环境以私有文件传入。`inconclusive` 表示没有密文，不能证明密钥正确。步骤与删除失败边界见 [恢复手册](docs/RECOVERY_RUNBOOK.md)。
 - **用户隔离：**视频查询、分类、处理和删除按 user_id；向量检索也有 user_id 过滤。未来上传、任务和存储接口必须继承同一边界。
 - **任务：**处理、分析、入库目前使用 PostgreSQL VideoTask 与独立 Worker；同视频活动任务由状态与部分唯一索引保护。失联租约可恢复，旧 Worker 在接管后不能推进下一阶段或覆盖任务终态。分析和可能已计费的云端转写中断要求手动重试。取消在阶段边界生效，不能中断当前外部调用；在途调用的外部副作用仍需单独评估。
 - **任务名额：**每用户 `queued` + `running` 总数默认上限 2，由 `MAX_ACTIVE_VIDEO_TASKS_PER_USER` 配置；入队锁定用户行，超限 429，同视频重复 409。取消排队任务立即释放名额；这是任务接收限制，不限制 Worker 的并行执行数。
