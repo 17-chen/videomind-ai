@@ -1,6 +1,7 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "请求过于频繁，请稍后重试": ["请求过于频繁，请稍后重试", "Too many requests. Please try again later."],
   "已取消": ["已取消", "Cancelled"],
   "任务阶段": ["任务阶段", "Task stage"],
   "尝试次数": ["尝试次数", "Attempts"],

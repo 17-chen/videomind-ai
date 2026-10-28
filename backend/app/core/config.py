@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     max_chat_requests_per_minute: int = Field(default=20, ge=1, le=1000)
     max_video_task_requests_per_minute: int = Field(default=10, ge=1, le=1000)
 
+    max_ingress_requests_per_peer_per_minute: int = Field(default=300, ge=1)
+    max_ingress_requests_per_minute: int = Field(default=3000, ge=1)
+
     video_storage_dir: str = "/app/storage/videos"
     audio_storage_dir: str = "/app/storage/audio"
     transcript_storage_dir: str = "/app/storage/transcripts"

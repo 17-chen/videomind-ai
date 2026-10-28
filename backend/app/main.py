@@ -13,6 +13,7 @@ from app.core.errors import register_exception_handlers
 from app.core.i18n import t
 from app.core.logging import configure_logging, logger
 from app.database.session import SessionLocal, create_database_tables
+from app.services.ingress_limits import IngressLimiter, IngressLimitMiddleware
 from app.services.videos import recover_interrupted_videos
 
 
@@ -44,12 +45,20 @@ app = FastAPI(
 )
 
 app.add_middleware(
+    IngressLimitMiddleware,
+    limiter=IngressLimiter(
+        settings.max_ingress_requests_per_peer_per_minute,
+        settings.max_ingress_requests_per_minute,
+    ),
+)
+
+app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Retry-After"],
 )
 
 

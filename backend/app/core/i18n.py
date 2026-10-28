@@ -1,4 +1,5 @@
 ZH_CN_MESSAGES: dict[str, str] = {
+    "ingress_limit_reached": "请求过于频繁，请稍后重试",
     "internal_server_error": "服务器内部错误",
     "video_already_processing": "视频正在处理中，请勿重复触发",
     "video_task_limit_reached": "当前处理任务已达上限，请等待完成或取消一个任务后重试",

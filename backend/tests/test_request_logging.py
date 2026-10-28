@@ -15,7 +15,7 @@ def test_request_trace_uses_route_template_without_user_supplied_path_or_query()
         response = client.get("/health", headers={"Origin": "http://localhost:3000"})
         request_id = response.headers["X-Request-ID"]
         assert re.fullmatch(r"[0-9a-f]{32}", request_id)
-        assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID"
+        assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID, Retry-After"
         assert response.status_code == 200
         assert any(f"request_id={request_id}" in message and "route=/health status=200" in message for message in messages)
 
