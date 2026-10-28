@@ -17,6 +17,12 @@
 | 前端 build/typecheck/lint | 当前源码在 `videomind-frontend-check:20261025` 的隔离临时副本离线通过；先用 `cmp` 确认镜像与仓库 `package-lock.json` 完全一致，Next.js 实际版本 16.4.3 |
 | `git diff --check` | 通过 |
 
+## GitHub 同步与自动检查
+
+- 功能提交 `b192c78` 已正常推送到 `origin/main`，没有强制推送。
+- [GitHub Actions 40631839773](https://github.com/17-chen/videomind-ai/actions/runs/40631839773) 后端和前端任务均成功，覆盖测试、Ruff、隔离 hash 检索、前端 build/typecheck/lint。CI 检查的是功能提交；本条证据的后续提交只更新文档。
+- 推送后本地与远端一致，工作树只保留原有未跟踪 `outputs/`。
+
 ## 检查过程发现与限制
 
 - 运行中的开发前端依赖实际是 Next.js 16.3.3。首次临时副本检查虽然通过，但不作为当前锁文件的验证结果，也没有改动开发服务依赖。

@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-10-28 补充：**R8 增加认证前的来源/进程总请求限制，默认每分钟 300/3000 次；拒绝在读取正文、认证与数据库调用之前发生，返回 429、Retry-After 和请求编号。内存来源表有上限；Compose/Dockerfile 禁用代理头信任，代理后会共享来源额度。后端 102 项测试及 Ruff 通过；当前锁文件匹配的 Next.js 16.4.3 临时副本 build/typecheck/lint 通过。详见 [限流说明](docs/INGRESS_LIMITS.md) 和 [核查记录](docs/VERIFICATION_2026-10-28.md)。这是单进程保护，多实例统一计数、存储总量和真实外部服务仍待验收。
+**2026-10-28 补充：**功能提交 `b192c78` 已同步 GitHub，[CI 40631839773](https://github.com/17-chen/videomind-ai/actions/runs/40631839773) 后端与前端均通过。R8 增加认证前的来源/进程总请求限制，默认每分钟 300/3000 次；拒绝在读取正文、认证与数据库调用之前发生，返回 429、Retry-After 和请求编号。内存来源表有上限；Compose/Dockerfile 禁用代理头信任，代理后会共享来源额度。后端 102 项测试及 Ruff 通过；当前锁文件匹配的 Next.js 16.4.3 临时副本 build/typecheck/lint 通过。详见 [限流说明](docs/INGRESS_LIMITS.md) 和 [核查记录](docs/VERIFICATION_2026-10-28.md)。这是单进程保护，多实例统一计数、存储总量和真实外部服务仍待验收。
 
 **2026-10-27 补充：**新增只读用户密钥恢复预检，合成密文测试覆盖模型和 ASR Key、错误密钥、空库与私有文件权限。后端 96 项测试及 Ruff 通过。本机 PostgreSQL 没有已保存的用户密文，返回 `inconclusive`，无法证明真实备份主密钥可恢复；当前主密钥及数据库均未修改。数据库、业务文件、Chroma 和主密钥的备份/隔离恢复步骤见 [恢复手册](docs/RECOVERY_RUNBOOK.md)，本轮证据见 [核查记录](docs/VERIFICATION_2026-10-27.md)。
 
