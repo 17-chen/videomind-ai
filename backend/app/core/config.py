@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     note_storage_dir: str = "/app/storage/notes"
     max_upload_mb: int = 1024
     max_user_upload_mb: int = Field(default=5120, ge=1)
+    max_user_storage_mb: int = Field(default=10240, ge=1)
     video_download_timeout_seconds: int = 1800
     audio_extraction_timeout_seconds: int = 900
     video_cookie_file: str = ""

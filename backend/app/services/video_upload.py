@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.errors import ApiError
 from app.models.user import User
 from app.models.video import Video, VideoStatus
+from app.services.storage_quota import check_storage_quota
 
 
 UPLOAD_EXTENSIONS = (".mp4", ".webm", ".mkv", ".mov", ".m4v")
@@ -28,6 +29,7 @@ def upload_policy() -> dict:
     return {
         "max_bytes": settings.max_upload_mb * 1024 * 1024,
         "max_user_upload_bytes": settings.max_user_upload_mb * 1024 * 1024,
+        "max_user_storage_bytes": settings.max_user_storage_mb * 1024 * 1024,
         "extensions": list(UPLOAD_EXTENSIONS),
     }
 
@@ -82,6 +84,7 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
             raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT)
 
         _check_user_upload_quota(db, user, byte_count)
+        check_storage_quota(db, user.id, byte_count)
 
         os.replace(partial_path, final_path)
         video = Video(
@@ -109,6 +112,7 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
         return video
     except Exception:
         if not committed:
+            db.rollback()
             partial_path.unlink(missing_ok=True)
             final_path.unlink(missing_ok=True)
         raise

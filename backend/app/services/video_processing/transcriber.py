@@ -4,6 +4,7 @@ from functools import lru_cache
 from openai import OpenAI
 
 from app.core.config import settings
+from app.services.storage_quota import artifact_directory
 from app.core.i18n import t
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import TranscriptResult
@@ -79,7 +80,7 @@ def _transcribe_locally(audio_path: str, video_id: str) -> TranscriptResult:
 
 
 def _persist_transcript_file(video_id: str, content: str) -> None:
-    output_dir = Path(settings.transcript_storage_dir)
+    output_dir = artifact_directory("transcript")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{video_id}.txt"
     output_path.write_text(content, encoding="utf-8")

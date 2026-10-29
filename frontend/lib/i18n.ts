@@ -1,6 +1,9 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "个人文件存储总量上限": ["个人文件存储总量上限", "Total file storage limit"],
+  "包括视频、音频、转写和笔记": ["包括视频、音频、转写和笔记", "Includes videos, audio, transcripts and notes"],
+  "已达到个人文件存储总量上限，请先删除不需要的视频": ["已达到个人文件存储总量上限，请先删除不需要的视频", "Your file storage limit has been reached. Delete videos you no longer need."],
   "请求过于频繁，请稍后重试": ["请求过于频繁，请稍后重试", "Too many requests. Please try again later."],
   "已取消": ["已取消", "Cancelled"],
   "任务阶段": ["任务阶段", "Task stage"],

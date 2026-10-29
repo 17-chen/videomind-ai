@@ -98,7 +98,7 @@ export async function createVideo(payload: { url: string; title?: string; descri
   });
 }
 
-export type UploadPolicy = { max_bytes: number; extensions: string[] };
+export type UploadPolicy = { max_bytes: number; max_user_storage_bytes: number; extensions: string[] };
 
 export async function getUploadPolicy() {
   return request<UploadPolicy>("/videos/upload-policy");

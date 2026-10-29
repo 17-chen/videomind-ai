@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import settings
+from app.services.storage_quota import artifact_directory
 from app.core.i18n import t
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.subtitles import SUBTITLE_LANGUAGES
@@ -18,7 +19,7 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
     except ImportError as exc:
         raise VideoProcessingError(t("yt_dlp_missing")) from exc
 
-    output_dir = Path(settings.video_storage_dir)
+    output_dir = artifact_directory("video")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_template = str(output_dir / f"{video_id}.%(ext)s")
 

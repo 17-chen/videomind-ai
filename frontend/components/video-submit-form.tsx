@@ -138,6 +138,7 @@ export function VideoSubmitForm() {
       <Input type="file" accept={uploadPolicy?.extensions.join(",") ?? ".mp4,.webm,.mkv,.mov,.m4v"} onChange={(event) => { setUploadFile(event.target.files?.[0] ?? null); setUploadError(""); }} />
       <Input value={uploadTitle} maxLength={500} onChange={(event) => setUploadTitle(event.target.value)} placeholder={tx("上传标题，可选")} />
       {uploadPolicy ? <p className="text-xs text-muted-foreground">{tx("最大文件大小")}：{Math.round(uploadPolicy.max_bytes / 1024 / 1024)} MB · {uploadPolicy.extensions.join("、")}</p> : null}
+      {uploadPolicy ? <p className="text-xs text-muted-foreground">{tx("个人文件存储总量上限")}：{Math.round(uploadPolicy.max_user_storage_bytes / 1024 / 1024)} MB · {tx("包括视频、音频、转写和笔记")}</p> : null}
       {uploadPolicyError ? <p className="text-sm text-destructive">{tx("无法读取上传限制，请稍后重试")}</p> : null}
       {uploadError ? <p className="text-sm text-destructive">{uploadError}</p> : null}
       <Button type="submit" disabled={uploading || !uploadFile || !uploadPolicy} className="w-full">

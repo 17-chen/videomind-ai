@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.errors import ApiError
 from app.core.logging import logger
 from app.services.ai_settings import resolve_asr_key
+from app.services.storage_quota import generate_artifacts
 from app.database.session import SessionLocal
 from app.models.transcript import Transcript
 from app.models.video import Video, VideoStatus
@@ -42,7 +43,7 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
                 raise VideoProcessingError("上传的视频文件不存在，请重新上传")
             downloaded = DownloadedVideo(video_id=video.id, url=video.url, file_path=video.media_path)
         else:
-            downloaded = download_video(url=video.url, video_id=video.id)
+            downloaded = generate_artifacts(db, video, "video", lambda: download_video(url=video.url, video_id=video.id))
         video.media_path = downloaded.file_path
         video.title = video.title or downloaded.title
         video.description = video.description or downloaded.description
@@ -52,7 +53,7 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
         db.add(video)
         db.commit()
 
-        subtitle_result = find_downloaded_subtitles(video_id=video.id)
+        subtitle_result = generate_artifacts(db, video, "transcript", lambda: find_downloaded_subtitles(video_id=video.id))
         if subtitle_result is not None:
             transcript_content = subtitle_result.content
         else:
@@ -64,12 +65,15 @@ def process_video(db: Session, video: Video, final_status: VideoStatus = VideoSt
                 asr_key = None
             else:
                 asr_key = resolve_asr_key(video.user)
-            audio = extract_audio(video_path=downloaded.file_path, video_id=video.id)
+            audio = generate_artifacts(db, video, "audio", lambda: extract_audio(video_path=downloaded.file_path, video_id=video.id))
             video.audio_path = audio.file_path
             db.add(video)
             db.commit()
 
-            transcript_result = transcribe_audio(audio_path=audio.file_path, video_id=video.id, api_key=asr_key)
+            transcript_result = generate_artifacts(
+                db, video, "transcript",
+                lambda: transcribe_audio(audio_path=audio.file_path, video_id=video.id, api_key=asr_key),
+            )
             transcript_content = transcript_result.content
 
         transcript = _upsert_transcript(db=db, video=video, content=transcript_content)

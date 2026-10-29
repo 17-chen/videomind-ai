@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from app.core.config import settings
+from app.services.storage_quota import artifact_directory
 from app.core.i18n import t
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import ExtractedAudio
@@ -17,7 +18,7 @@ def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
     if not input_path.exists():
         raise VideoProcessingError(f"{t('video_file_missing')}: {video_path}")
 
-    output_dir = Path(settings.audio_storage_dir)
+    output_dir = artifact_directory("audio")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{video_id}.mp3"
 

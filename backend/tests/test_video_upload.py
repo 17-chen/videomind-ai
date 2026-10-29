@@ -156,3 +156,21 @@ def test_uploaded_video_uses_local_media_without_downloading(monkeypatch, tmp_pa
         assert "My recorded lesson" in indexed[0]["document"]
         assert calls == ["own-asr-key"]
     engine.dispose()
+
+
+def test_upload_total_quota_returns_413_for_existing_generated_files(upload_api, monkeypatch):
+    client, engine, root = upload_api
+    monkeypatch.setattr(settings, 'max_user_storage_mb', 1)
+    monkeypatch.setattr(settings, 'note_storage_dir', str(root / 'notes'))
+    first = upload(client, contents=b'a' * (700 * 1024))
+    assert first.status_code == 201
+    notes = root / 'notes'
+    notes.mkdir()
+    (notes / f"{first.json()['id']}.md").write_bytes(b'n' * (200 * 1024))
+    response = upload(client, contents=b'b' * (200 * 1024))
+    assert response.status_code == 413
+    assert '存储总量' in response.json()['detail']
+    assert client.get('/api/v1/videos/upload-policy', headers=auth('alice')).json()['max_user_storage_bytes'] == 1024 * 1024
+    with Session(engine) as db:
+        assert db.query(Video).count() == 1
+    assert not list((root / 'videos').glob('*.part'))

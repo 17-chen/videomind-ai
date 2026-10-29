@@ -15,6 +15,7 @@ from app.models.video_task import VideoTask
 from app.schemas.video import VideoCreate, VideoNoteUpdate, VideoUpdate
 from app.services.analysis import _persist_markdown_note
 from app.services.rag import index_video
+from app.services.storage_quota import generate_artifacts
 from app.services.vector_store import vector_store
 
 
@@ -164,9 +165,9 @@ def update_note_for_user(db: Session, user: User, video_id: str, payload: VideoN
     _ensure_editable(video)
     if video.summary is None:
         raise ApiError("请先完成 AI 分析，再编辑笔记", status_code=status.HTTP_409_CONFLICT)
+    generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, payload.markdown_note))
     video.summary.markdown_note = payload.markdown_note
     video.summary.note_is_manual = True
-    _persist_markdown_note(video.id, payload.markdown_note)
     _commit_and_sync(db, video)
     return video
 

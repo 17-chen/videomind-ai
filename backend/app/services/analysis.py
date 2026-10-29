@@ -1,10 +1,8 @@
-from pathlib import Path
-
 from fastapi import status
 from sqlalchemy.orm import Session
 
 from app.agents.video_analysis_agent import analyze_video_transcript
-from app.core.config import settings
+from app.services.storage_quota import artifact_directory, generate_artifacts
 from app.core.errors import ApiError
 from app.core.i18n import t
 from app.models.summary import Summary
@@ -20,6 +18,9 @@ def analyze_video(db: Session, video: Video) -> Summary:
         user=video.user,
         video_title=video.title,
     )
+    if video.summary is None or not video.summary.note_is_manual:
+        generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, markdown_note))
+
     summary = video.summary
     if summary is None:
         summary = Summary(video_id=video.id, summary=analysis.summary)
@@ -37,7 +38,6 @@ def analyze_video(db: Session, video: Video) -> Summary:
     summary.target_audience = analysis.target_audience
     summary.analysis_json = analysis.model_dump()
     if not summary.note_is_manual:
-        _persist_markdown_note(video_id=video.id, markdown_note=markdown_note)
         summary.markdown_note = markdown_note
 
     db.add(summary)
@@ -47,7 +47,7 @@ def analyze_video(db: Session, video: Video) -> Summary:
 
 
 def _persist_markdown_note(video_id: str, markdown_note: str) -> None:
-    output_dir = Path(settings.note_storage_dir)
+    output_dir = artifact_directory("note")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{video_id}.md"
     output_path.write_text(markdown_note, encoding="utf-8")
