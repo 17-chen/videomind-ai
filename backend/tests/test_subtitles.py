@@ -33,3 +33,17 @@ def test_prefers_chinese_subtitles_and_falls_back_from_empty_file(monkeypatch, t
     result = find_downloaded_subtitles("video")
     assert result is not None
     assert result.content == "English caption"
+
+
+def test_parse_preserves_repeated_phrase_after_other_caption(tmp_path):
+    subtitle = tmp_path / "video.zh.vtt"
+    subtitle.write_text(
+        "WEBVTT\n\n"
+        "00:00.000 --> 00:01.000\n重复的话\n\n"
+        "00:01.000 --> 00:02.000\n重复的话\n\n"
+        "00:02.000 --> 00:03.000\n另一句话\n\n"
+        "00:03.000 --> 00:04.000\n重复的话\n",
+        encoding="utf-8",
+    )
+
+    assert _parse_subtitle_text(subtitle) == "重复的话\n另一句话\n重复的话"

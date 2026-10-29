@@ -43,7 +43,6 @@ def find_downloaded_subtitles(video_id: str) -> SubtitleResult | None:
 def _parse_subtitle_text(path: Path) -> str:
     raw_text = path.read_text(encoding="utf-8", errors="ignore")
     lines: list[str] = []
-    seen: set[str] = set()
 
     for raw_line in raw_text.splitlines():
         line = raw_line.strip()
@@ -53,10 +52,9 @@ def _parse_subtitle_text(path: Path) -> str:
             continue
 
         cleaned = TAG_PATTERN.sub("", line).strip()
-        if not cleaned or cleaned in seen:
+        if not cleaned or (lines and cleaned == lines[-1]):
             continue
 
-        seen.add(cleaned)
         lines.append(cleaned)
 
     return "\n".join(lines).strip()
