@@ -12,12 +12,19 @@
 ## 检查结果
 
 - 后端最终全量：`RUN_POSTGRES_QUOTA_TESTS=1 python -m pytest -q` **118 passed**，包含两个真实 PostgreSQL 并发用例，无跳过；`ruff check app tests scripts` 通过。pytest 仍有原有 LangGraph 弃用提示。
-- `git diff --check` 通过。GitHub 推送与 CI 结果在实际完成后记录。
+- `git diff --check` 通过。首次功能提交 `1751e77` 已正常推送。
+- 首次 [CI 40873882215](https://github.com/17-chen/videomind-ai/actions/runs/40873882215) 前端通过，后端 7 个旧模拟用例因默认 `/app/storage` 在普通用户下不可写而失败；两个 PostgreSQL 配额竞争用例通过。随后新增逐测试业务目录隔离，以无特权 UID 65534 运行同一套回归，**118 项全通过**，Ruff 通过。修复后的 CI 在实际完成后记录。
 
 - 真实 PostgreSQL 双会话：`RUN_POSTGRES_QUOTA_TESTS=1 python -m pytest -q` 中，两个生成文件同时发布，以及上传与生成文件竞争，均在 1 MB 配额下各尝试保存 700 KB；两个场景均一成功一拒绝，最终正式文件 700 KB，无残余 staging/part。用例新建随机命名的一次性数据库，完成后只删除自己的数据库；CI 也启用这两个测试。
 - 自动回归覆盖全类型/跨用户统计、超限前保留旧文件、生成失败清理、净增量/超额后缩小、未知归属/软链接拒绝、上传 HTTP 413、手工笔记拒绝后的数据库一致性、AI 分析拒绝、分阶段保留已保存媒体、Worker 失败状态，以及视频在生成期间被删除时不发布新文件。
 - 真实媒体工具检查：临时目录中用 ffmpeg 生成 1 秒蓝色视频和正弦波音频；真实 ffprobe 校验上传，再用真实 ffmpeg 提取音频。ASR 和分析明确模拟。四类正式文件实际共 18,302 字节，与本人核算完全一致；后续超大笔记被 413 拒绝，原笔记和摘要保留。没有真实语音识别或模型服务验收。
 - 前端：当前源码在已有 `videomind-frontend-check:20261025` 镜像中离线运行。先 `cmp` 确认锁文件完全一致，实际 Next.js 16.4.3；临时副本 build、typecheck、lint 退出 0，不覆盖开发预览的 `.next`。临时 node_modules 链接导致原有 27 个 tracing-root 警告，产物不作为部署镜像验收；远端 CI 从锁文件重新安装。
+
+## 本机服务与文件保留
+
+- 只读队列快照显示 queued/running 均为 0、无过期租约后，重启 Worker 加载新实现；运行进程正常。
+- 实际 API 的热更新仍返回旧上传策略，因此又重启 API；随后确认 VideoMind readiness 200，在线上传策略总量为 10240 MB。不将此前热更新误判为已加载。
+- 没有重建数据卷或改动现有主密钥。原有 `outputs/` 保留；后续出现的未跟踪 `backend/:memory:.ses` 来源未确认，也保留且不提交。
 
 ## 未验收及下一步
 

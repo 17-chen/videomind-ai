@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-10-29 补充：**后端全量 118 项测试（含两个真实 PostgreSQL 并发用例）及 Ruff 通过。R8 本地正式文件总量默认 10240 MB，上传、URL 下载/字幕、音频、转写和 Markdown 共用同一用户行锁核算；分阶段暂存，超限保留旧内容，等大替换/缩小允许。真实 PostgreSQL 双会话和自生成媒体的真实 ffmpeg/ffprobe 检查通过，ASR/分析模拟；前端当前锁文件匹配的 16.4.3 临时副本 build/typecheck/lint 通过。详见 [配额说明](docs/STORAGE_QUOTA.md) 与 [核查](docs/VERIFICATION_2026-10-29.md)。临时空间、孤立文件和云端持久性未覆盖。
+**2026-10-29 补充：**首次 CI 暴露测试目录权限依赖，已补逐测试隔离并以无特权用户验证；空队列后重启本机 API/Worker，在线新策略可读。后续出现的未跟踪 `backend/:memory:.ses` 来源未确认，保留且不提交。后端全量 118 项测试（含两个真实 PostgreSQL 并发用例）及 Ruff 通过。R8 本地正式文件总量默认 10240 MB，上传、URL 下载/字幕、音频、转写和 Markdown 共用同一用户行锁核算；分阶段暂存，超限保留旧内容，等大替换/缩小允许。真实 PostgreSQL 双会话和自生成媒体的真实 ffmpeg/ffprobe 检查通过，ASR/分析模拟；前端当前锁文件匹配的 16.4.3 临时副本 build/typecheck/lint 通过。详见 [配额说明](docs/STORAGE_QUOTA.md) 与 [核查](docs/VERIFICATION_2026-10-29.md)。临时空间、孤立文件和云端持久性未覆盖。
 
 **2026-10-28 补充：**功能提交 `b192c78` 已同步 GitHub，[CI 40631839773](https://github.com/17-chen/videomind-ai/actions/runs/40631839773) 后端与前端均通过。R8 增加认证前的来源/进程总请求限制，默认每分钟 300/3000 次；拒绝在读取正文、认证与数据库调用之前发生，返回 429、Retry-After 和请求编号。内存来源表有上限；Compose/Dockerfile 禁用代理头信任，代理后会共享来源额度。后端 102 项测试及 Ruff 通过；当前锁文件匹配的 Next.js 16.4.3 临时副本 build/typecheck/lint 通过。详见 [限流说明](docs/INGRESS_LIMITS.md) 和 [核查记录](docs/VERIFICATION_2026-10-28.md)。这是单进程保护，多实例统一计数、存储总量和真实外部服务仍待验收。
 

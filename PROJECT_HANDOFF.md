@@ -4,7 +4,7 @@
 
 ## 1. 先读摘要
 
-**2026-10-29 更新：**后端 118 项测试（含真实 PostgreSQL 并发）及 Ruff 通过。从本地/远端一致的 `4e8fced` 继续。R8 新增正式业务文件总量，默认 10240 MB，覆盖上传、下载/字幕、音频、转写、AI/手工笔记，临时生成后用用户行锁核算发布。PostgreSQL 双会话及真实 ffmpeg/ffprobe 自生成媒体检查通过，ASR/分析为模拟；前端当前版本检查通过。见 [配额说明](docs/STORAGE_QUOTA.md) 与 [本轮核查](docs/VERIFICATION_2026-10-29.md)。原有 `outputs/` 保留；临时磁盘/孤立文件与云端边界仍待补。
+**2026-10-29 更新：**首次 CI 的测试目录权限依赖已修复；无特权用户 118 项通过。空队列时重启 API/Worker 后在线策略正常。后续未跟踪 `backend/:memory:.ses` 来源未确认，保留且不提交。后端 118 项测试（含真实 PostgreSQL 并发）及 Ruff 通过。从本地/远端一致的 `4e8fced` 继续。R8 新增正式业务文件总量，默认 10240 MB，覆盖上传、下载/字幕、音频、转写、AI/手工笔记，临时生成后用用户行锁核算发布。PostgreSQL 双会话及真实 ffmpeg/ffprobe 自生成媒体检查通过，ASR/分析为模拟；前端当前版本检查通过。见 [配额说明](docs/STORAGE_QUOTA.md) 与 [本轮核查](docs/VERIFICATION_2026-10-29.md)。原有 `outputs/` 保留；临时磁盘/孤立文件与云端边界仍待补。
 
 **2026-10-28 更新：**功能提交 `b192c78` 已同步 GitHub，[CI 40631839773](https://github.com/17-chen/videomind-ai/actions/runs/40631839773) 两项任务通过。先核对远端，本轮起点为 `d04f9df`，本地与远端一致，原有 `outputs/` 保留。新增 R8 认证前本地流量限制，102 项后端测试/Ruff 及隔离真实 HTTP 检查通过；当前锁文件匹配的 Next.js 16.4.3 临时副本 build/typecheck/lint 通过；详细配置、代理共享额度与多实例边界见 [限流说明](docs/INGRESS_LIMITS.md)，检查证据见 [本轮记录](docs/VERIFICATION_2026-10-28.md)。开发前端容器依赖仍为 16.3.3，不应拿其构建结果证明锁文件的 16.4.3。以下有日期证据保留为历史记录。
 
