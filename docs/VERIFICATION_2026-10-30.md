@@ -20,7 +20,7 @@
 - `docker compose config --quiet` 与 `git diff --check` 通过。
 - Next dev 自动改写 `frontend/next-env.d.ts` 的 dev 类型路径，核对后仅恢复这两行生成路径，不混入无关变更。
 
-- 开发 Dockerfile 的禁网重建没有命中 npm 安装缓存，`npm ci` 报 `Exit handler never called`，该次构建未通过，不能以此前镜像替代。随后改用 `--network host`，从当前 Dockerfile 正常安装并构建开发镜像 `videomind-frontend-dev-verify:20261030` 成功；构建时 npm 报 0 vulnerabilities。该次成功只代表本机开发镜像，不代表默认网络、生产镜像或目标平台验收。新镜像离线执行启动校验通过，实际 Next.js 16.4.3；旧镜像另保留标签后用于更新本机前端。GitHub CI 结果在完成后记录。
+- 开发 Dockerfile 的禁网重建没有命中 npm 安装缓存，`npm ci` 报 `Exit handler never called`，该次构建未通过，不能以此前镜像替代。随后改用 `--network host`，从当前 Dockerfile 正常安装并构建开发镜像 `videomind-frontend-dev-verify:20261030` 成功；构建时 npm 报 0 vulnerabilities。该次成功只代表本机开发镜像，不代表默认网络、生产镜像或目标平台验收。新镜像离线执行启动校验通过，实际 Next.js 16.4.3；旧镜像另保留标签后用于更新本机前端。功能提交 `99adac4` 已正常同步 GitHub，[CI 41034408189](https://github.com/17-chen/videomind-ai/actions/runs/41034408189) 后端与前端均通过，包含检索基线；后续记录只修改文档。
 
 ## 未验收边界
 

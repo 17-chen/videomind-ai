@@ -4,7 +4,7 @@
 
 ## 1. 先读摘要
 
-**2026-10-30 更新：**本机前端实际版本已修复为 Next.js 16.4.3，锁文件启动校验防止旧依赖静默启动，旧卷保留。R8 新增只读磁盘聚合对账；本机扫描完整、无活动任务，9 个未归属文件全部保留，无删除操作。后端无特权用户 124 项测试及 Ruff、前端隔离 build/typecheck/lint、四页真实开发预览 HTTP 200 通过。见 [本轮核查](docs/VERIFICATION_2026-10-30.md)、[前端依赖](docs/FRONTEND_DEVELOPMENT.md)、[磁盘对账](docs/STORAGE_MONITORING.md)。
+**2026-10-30 更新：**功能提交 `99adac4` 已同步 GitHub，[CI 41034408189](https://github.com/17-chen/videomind-ai/actions/runs/41034408189) 后端与前端均通过。本机前端实际版本已修复为 Next.js 16.4.3，锁文件启动校验防止旧依赖静默启动，旧卷保留。R8 新增只读磁盘聚合对账；本机扫描完整、无活动任务，9 个未归属文件全部保留，无删除操作。后端无特权用户 124 项测试及 Ruff、前端隔离 build/typecheck/lint、四页真实开发预览 HTTP 200 通过。见 [本轮核查](docs/VERIFICATION_2026-10-30.md)、[前端依赖](docs/FRONTEND_DEVELOPMENT.md)、[磁盘对账](docs/STORAGE_MONITORING.md)。
 
 **2026-10-29 更新（历史证据）：**功能 `1751e77`、测试隔离修复 `290cb47` 已同步 GitHub，[CI 40874438964](https://github.com/17-chen/videomind-ai/actions/runs/40874438964) 后端与前端均通过。首次 CI 的测试目录权限依赖已修复；无特权用户 118 项通过。空队列时重启 API/Worker 后在线策略正常。后续未跟踪 `backend/:memory:.ses` 来源未确认，保留且不提交。后端 118 项测试（含真实 PostgreSQL 并发）及 Ruff 通过。从本地/远端一致的 `4e8fced` 继续。R8 新增正式业务文件总量，默认 10240 MB，覆盖上传、下载/字幕、音频、转写、AI/手工笔记，临时生成后用用户行锁核算发布。PostgreSQL 双会话及真实 ffmpeg/ffprobe 自生成媒体检查通过，ASR/分析为模拟；前端当前版本检查通过。见 [配额说明](docs/STORAGE_QUOTA.md) 与 [本轮核查](docs/VERIFICATION_2026-10-29.md)。原有 `outputs/` 保留；临时磁盘/孤立文件与云端边界仍待补。
 
@@ -18,7 +18,7 @@
 - **交接时 Git 基线：**2026-10-27 已快进合入 GitHub 并行文档提交 `41d743d`（中英文 README）；此前功能与恢复预检提交为 `1242761`，CI 记录提交为 `5b19d36`。交接文档自身提交后，以新聊天实际 `git status`、`git log` 为准。原有未跟踪 `outputs/` 保留不动。
 - **最新后端证据：**2026-10-30，新增磁盘只读对账；124 项后端测试（含真实 PostgreSQL 并发）及 Ruff 通过，见 [核查](docs/VERIFICATION_2026-10-30.md)。2026-10-27 只读密钥预检仍为 0 条密文、`inconclusive`，真实恢复未验收。
 - **最新前端证据：**2026-10-30，实际开发容器升级至 Next.js 16.4.3，四页预览 HTTP 200，当前源码隔离 build/typecheck/lint 通过；2026-10-25 的独立生产镜像与 `/auth` HTTP 检查为此前证据，临时副本不作为部署镜像。
-- **自动检查：**测试隔离修复提交 `290cb47` 的 [GitHub CI 40874438964](https://github.com/17-chen/videomind-ai/actions/runs/40874438964) 后端与前端任务均通过；首次失败与修复原因见 [本轮核查](docs/VERIFICATION_2026-10-29.md)。
+- **自动检查：**本轮功能提交 `99adac4` 的 [GitHub CI 41034408189](https://github.com/17-chen/videomind-ai/actions/runs/41034408189) 后端与前端均通过；上一轮目录权限失败与修复保留在 [2026-10-29 核查](docs/VERIFICATION_2026-10-29.md)。
 - **2026-10-22 本地模型证据：**独立镜像的可选依赖与 `pip check` 通过；faster-whisper base 已转写合成中文音频及一个 NASA 真实公开视频。后者的 URL 下载、本地上传、无字幕缺 Key 失败路径在隔离数据库通过；真实 BGE 在固定虚构语料上完成隔离检索，详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
 - **下一步：**不依赖外部账号时，先推进 R8 临时空间、可恢复孤立文件清理及生产统一流量边界（只读聚合对账已补）（正式文件总量与本地认证前限流已有实现），并继续 R1 中文自然语音、跨主题检索与引用评测，R5 真实媒体故障演练。R2 真实分析/问答、R7 双用户和 R6/R9 云端验收需相应账号、资源或本人模型配置。
 - **本轮未完成的验收：**中文自然语音质量、真实笔记/向量/问答、Supabase/服务商调用和多实例运行仍待验证；英文公开视频的 72.73% Recall@2 也不是完整服务质量验收。
