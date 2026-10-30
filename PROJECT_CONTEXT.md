@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-29。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-10-30。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
@@ -34,6 +34,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-10-30 补充：**本机开发前端已实际切换 Next.js 16.4.3；增加锁文件/直接依赖启动校验，保留旧卷，预览四页 HTTP 200。R8 新增 `storage_status` 只读元数据对账，实际扫描完整、活动任务 0、9 个未归属文件全部保留；没有执行清理。后端无特权用户 124 项测试/Ruff，前端隔离 build/typecheck/lint 通过。见 [核查](docs/VERIFICATION_2026-10-30.md)、[磁盘说明](docs/STORAGE_MONITORING.md) 和 [前端开发说明](docs/FRONTEND_DEVELOPMENT.md)。
 
 **2026-10-29 补充：**功能 `1751e77` 和测试隔离修复 `290cb47` 已同步 GitHub，[CI 40874438964](https://github.com/17-chen/videomind-ai/actions/runs/40874438964) 后端与前端均通过。首次 CI 暴露测试目录权限依赖，已补逐测试隔离并以无特权用户验证；空队列后重启本机 API/Worker，在线新策略可读。后续出现的未跟踪 `backend/:memory:.ses` 来源未确认，保留且不提交。后端全量 118 项测试（含两个真实 PostgreSQL 并发用例）及 Ruff 通过。R8 本地正式文件总量默认 10240 MB，上传、URL 下载/字幕、音频、转写和 Markdown 共用同一用户行锁核算；分阶段暂存，超限保留旧内容，等大替换/缩小允许。真实 PostgreSQL 双会话和自生成媒体的真实 ffmpeg/ffprobe 检查通过，ASR/分析模拟；前端当前锁文件匹配的 16.4.3 临时副本 build/typecheck/lint 通过。详见 [配额说明](docs/STORAGE_QUOTA.md) 与 [核查](docs/VERIFICATION_2026-10-29.md)。临时空间、孤立文件和云端持久性未覆盖。
 

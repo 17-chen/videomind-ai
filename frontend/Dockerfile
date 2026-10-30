@@ -3,6 +3,7 @@ FROM node:22-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
+RUN sha256sum package-lock.json | cut -d ' ' -f1 > node_modules/.videomind-lock.sha256
 
 FROM dependencies AS development
 
@@ -10,7 +11,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 
-CMD ["npm", "run", "dev"]
+CMD ["sh", "-c", "node scripts/ensure-dependencies.mjs && exec npm run dev"]
 
 FROM node:22-alpine AS builder
 
