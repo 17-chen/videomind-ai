@@ -19,7 +19,7 @@
 - **本机加载：**只读确认 queued/running 均为 0 后，仅重建 API/Worker 容器加载新策略及当前启动参数；保留全部数据卷与密钥。在线 readiness 200、上传有效上限 1024 MB，进程配置阶段容量 2048 MB/余量阈值 1024 MB。
 - 只读磁盘快照完整，活动任务 0、扫描错误 0、暂存目录/待提交 part/UUID 孤立文件为 0；此前 9 个未归属文件共 6,798,912 字节仍保留。本轮没有通过填满真实磁盘来测试。
 
-GitHub 推送和 CI 结果在实际完成后补充。
+功能提交 `72db8ce` 已同步 GitHub，[CI 41192394623](https://github.com/17-chen/videomind-ai/actions/runs/41192394623) 后端与前端均通过。远端检查覆盖后端测试、Ruff、隔离 hash 检索基线，以及前端 build/typecheck/lint；hash 虚构语料检查不替代真实模型验收。
 
 ## 尚未验收
 
