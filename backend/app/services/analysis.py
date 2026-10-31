@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.video_analysis_agent import analyze_video_transcript
 from app.services.storage_quota import artifact_directory, generate_artifacts
+from app.services.temporary_storage import ensure_free_space, write_bounded_text
 from app.core.errors import ApiError
 from app.core.i18n import t
 from app.models.summary import Summary
@@ -12,6 +13,11 @@ from app.models.video import Video
 def analyze_video(db: Session, video: Video) -> Summary:
     if video.transcript is None or not video.transcript.content.strip():
         raise ApiError(t("transcript_required"), status_code=status.HTTP_400_BAD_REQUEST)
+
+    if video.summary is None or not video.summary.note_is_manual:
+        output_dir = artifact_directory("note")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        ensure_free_space(output_dir)
 
     analysis, markdown_note = analyze_video_transcript(
         transcript=video.transcript.content,
@@ -50,4 +56,4 @@ def _persist_markdown_note(video_id: str, markdown_note: str) -> None:
     output_dir = artifact_directory("note")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{video_id}.md"
-    output_path.write_text(markdown_note, encoding="utf-8")
+    write_bounded_text(output_path, markdown_note)

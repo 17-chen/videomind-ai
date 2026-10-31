@@ -1,6 +1,9 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "本次处理的临时文件超过大小上限，请使用较小的视频": ["本次处理的临时文件超过大小上限，请使用较小的视频", "Temporary processing files exceed the size limit. Please use a smaller video."],
+  "服务器临时空间不足，请稍后重试": ["服务器临时空间不足，请稍后重试", "The server has insufficient temporary storage. Please try again later."],
+  "视频下载超时，请稍后重试": ["视频下载超时，请稍后重试", "Video download timed out. Please try again later."],
   "个人文件存储总量上限": ["个人文件存储总量上限", "Total file storage limit"],
   "包括视频、音频、转写和笔记": ["包括视频、音频、转写和笔记", "Includes videos, audio, transcripts and notes"],
   "已达到个人文件存储总量上限，请先删除不需要的视频": ["已达到个人文件存储总量上限，请先删除不需要的视频", "Your file storage limit has been reached. Delete videos you no longer need."],

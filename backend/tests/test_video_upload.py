@@ -174,3 +174,27 @@ def test_upload_total_quota_returns_413_for_existing_generated_files(upload_api,
     with Session(engine) as db:
         assert db.query(Video).count() == 1
     assert not list((root / 'videos').glob('*.part'))
+
+
+@pytest.mark.parametrize('low_disk', [True, False], ids=['disk-full-feedback', 'stage-size-feedback'])
+def test_temporary_space_rejections_have_http_feedback_and_no_partial_files(upload_api, monkeypatch, low_disk):
+    from types import SimpleNamespace
+    from app.services import temporary_storage
+
+    client, engine, root = upload_api
+    monkeypatch.setattr(settings, 'max_upload_mb', 2)
+    monkeypatch.setattr(settings, 'max_media_stage_mb', 1)
+    if low_disk:
+        monkeypatch.setattr(settings, 'min_media_free_space_mb', 1)
+        monkeypatch.setattr(temporary_storage.shutil, 'disk_usage', lambda _: SimpleNamespace(free=0))
+        response = upload(client, contents=b'small')
+        assert response.status_code == 507
+        assert '空间不足' in response.json()['detail']
+    else:
+        response = upload(client, contents=b'x' * (1024 * 1024 + 1))
+        assert response.status_code == 413
+        assert '临时文件' in response.json()['detail']
+        assert client.get('/api/v1/videos/upload-policy', headers=auth('alice')).json()['max_bytes'] == 1024 * 1024
+    assert not list((root / 'videos').iterdir())
+    with Session(engine) as db:
+        assert db.query(Video).count() == 0

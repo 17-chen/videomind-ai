@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.services.storage_quota import artifact_directory
+from app.services.temporary_storage import write_bounded_text
 from app.services.video_processing.types import SubtitleResult
 
 
@@ -65,4 +66,4 @@ def _persist_transcript_file(video_id: str, content: str) -> None:
     output_dir = artifact_directory("transcript")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{video_id}.txt"
-    output_path.write_text(content, encoding="utf-8")
+    write_bounded_text(output_path, content)

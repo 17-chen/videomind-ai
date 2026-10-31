@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.core.errors import ApiError
 from app.models.user import User
 from app.models.video import Video
+from app.services.temporary_storage import check_stage_space, ensure_free_space
 
 
 ARTIFACT_KINDS = ("video", "audio", "transcript", "note")
@@ -81,6 +82,7 @@ def check_storage_quota(
 def staging_directory(kind: str) -> Iterator[Path]:
     root = Path(getattr(settings, f"{kind}_storage_dir"))
     root.mkdir(parents=True, exist_ok=True)
+    ensure_free_space(root)
     with TemporaryDirectory(prefix=".staging-", dir=root) as directory:
         path = Path(directory)
         token = _staging.set({**_staging.get(), kind: path})
@@ -98,6 +100,7 @@ def generate_artifacts(db: Session, video: Video, kind: str, producer: Callable[
     """
     with staging_directory(kind) as staged:
         result = producer()
+        check_stage_space(staged)
         files = list(staged.iterdir())
         if not files:
             return result

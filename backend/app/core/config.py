@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     max_upload_mb: int = 1024
     max_user_upload_mb: int = Field(default=5120, ge=1)
     max_user_storage_mb: int = Field(default=10240, ge=1)
+    max_media_stage_mb: int = Field(default=2048, ge=1)
+    min_media_free_space_mb: int = Field(default=1024, ge=0)
     video_download_timeout_seconds: int = 1800
     audio_extraction_timeout_seconds: int = 900
     video_cookie_file: str = ""

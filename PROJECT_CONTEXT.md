@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-30。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-10-31。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
@@ -34,6 +34,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-10-31 补充：**R8 增加临时阶段容量 2048 MB、余量阈值 1024 MB、上传流/下载检查点/文本写入检查；音频使用独立子进程内核单文件限制，超限不发布截断结果。无特权用户 141 项测试/Ruff、前端隔离检查通过，含真实本地 HTTP/ffmpeg/资源上限检查；模拟低空间不计真实服务验收。配置和剩余的并发/合并预留边界见 [说明](docs/TEMPORARY_STORAGE.md) 与 [核查](docs/VERIFICATION_2026-10-31.md)。
 
 **2026-10-30 补充：**功能提交 `99adac4` 已同步 GitHub，[CI 41034408189](https://github.com/17-chen/videomind-ai/actions/runs/41034408189) 后端与前端均通过。本机开发前端已实际切换 Next.js 16.4.3；增加锁文件/直接依赖启动校验，保留旧卷，预览四页 HTTP 200。R8 新增 `storage_status` 只读元数据对账，实际扫描完整、活动任务 0、9 个未归属文件全部保留；没有执行清理。后端无特权用户 124 项测试/Ruff，前端隔离 build/typecheck/lint 通过。见 [核查](docs/VERIFICATION_2026-10-30.md)、[磁盘说明](docs/STORAGE_MONITORING.md) 和 [前端开发说明](docs/FRONTEND_DEVELOPMENT.md)。
 

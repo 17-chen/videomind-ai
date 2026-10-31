@@ -19,6 +19,7 @@ from app.core.errors import ApiError
 from app.models.user import User
 from app.models.video import Video, VideoStatus
 from app.services.storage_quota import check_storage_quota
+from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, ensure_free_space, stage_limit_bytes
 
 
 UPLOAD_EXTENSIONS = (".mp4", ".webm", ".mkv", ".mov", ".m4v")
@@ -27,7 +28,7 @@ CHUNK_SIZE = 1024 * 1024
 
 def upload_policy() -> dict:
     return {
-        "max_bytes": settings.max_upload_mb * 1024 * 1024,
+        "max_bytes": min(settings.max_upload_mb * 1024 * 1024, stage_limit_bytes()),
         "max_user_upload_bytes": settings.max_user_upload_mb * 1024 * 1024,
         "max_user_storage_bytes": settings.max_user_storage_mb * 1024 * 1024,
         "extensions": list(UPLOAD_EXTENSIONS),
@@ -69,11 +70,15 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
     max_bytes = settings.max_upload_mb * 1024 * 1024
     committed = False
     try:
+        ensure_free_space(storage_dir)
         with partial_path.open("xb") as output:
             while chunk := file.file.read(CHUNK_SIZE):
                 byte_count += len(chunk)
                 if byte_count > max_bytes:
                     raise ApiError(f"视频不能超过 {settings.max_upload_mb} MB", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+                if byte_count > stage_limit_bytes():
+                    raise ApiError(STAGE_LIMIT_MESSAGE, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+                ensure_free_space(storage_dir, incoming_bytes=len(chunk))
                 digest.update(chunk)
                 output.write(chunk)
         if not byte_count:
