@@ -90,6 +90,7 @@ services:
 
   worker:
     image: videomind-ai-backend
+    init: true
     container_name: videomind-worker
     profiles: ["app"]
     restart: unless-stopped

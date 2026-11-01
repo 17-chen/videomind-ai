@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -28,7 +29,7 @@ def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
     ensure_free_space(output_dir)
     limit = stage_limit_bytes()
     command = [
-        sys.executable, "-m", "app.services.video_processing.limited_exec", str(limit),
+        sys.executable, "-m", "app.services.video_processing.limited_exec", str(limit), str(os.getpid()),
         ffmpeg_path,
         "-loglevel", "error",
         "-y",

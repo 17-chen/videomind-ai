@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-10-31。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-01。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
@@ -34,6 +34,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-11-01 补充：**R5/R8 新增 Linux 音频进程随 Worker 退出保护；真实 ffmpeg 在 SIGKILL/SIGTERM 后停止，超时清理与过期租约重试通过。队列使用隔离 SQLite，ASR 返回为模拟，未访问外部服务。后端 146 项测试/Ruff、前端临时副本 build/typecheck/lint 通过，见 [本轮核查](docs/VERIFICATION_2026-11-01.md)。遗留暂存文件不自动删除，下载合并子进程和长期多实例仍待验收。
 
 **2026-10-31 补充：**功能提交 `72db8ce` 已同步 GitHub，[CI 41192394623](https://github.com/17-chen/videomind-ai/actions/runs/41192394623) 后端与前端均通过。R8 增加临时阶段容量 2048 MB、余量阈值 1024 MB、上传流/下载检查点/文本写入检查；音频使用独立子进程内核单文件限制，超限不发布截断结果。无特权用户 141 项测试/Ruff、前端隔离检查通过，含真实本地 HTTP/ffmpeg/资源上限检查；模拟低空间不计真实服务验收。配置和剩余的并发/合并预留边界见 [说明](docs/TEMPORARY_STORAGE.md) 与 [核查](docs/VERIFICATION_2026-10-31.md)。
 

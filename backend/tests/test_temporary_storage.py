@@ -1,5 +1,6 @@
 from io import BytesIO
 from pathlib import Path
+import os
 import resource
 import shutil
 from types import SimpleNamespace
@@ -112,7 +113,7 @@ def test_file_limit_is_enforced_in_child_without_changing_parent(tmp_path):
     before_core = resource.getrlimit(resource.RLIMIT_CORE)
     output = tmp_path / 'bounded.bin'
     result = subprocess.run([
-        sys.executable, '-m', 'app.services.video_processing.limited_exec', str(limit),
+        sys.executable, '-m', 'app.services.video_processing.limited_exec', str(limit), str(os.getpid()),
         sys.executable, '-c', 'import pathlib,sys,resource; assert resource.getrlimit(resource.RLIMIT_CORE) == (0,0); pathlib.Path(sys.argv[1]).write_bytes(b"x" * (4 * 1024 * 1024))', str(output),
     ], capture_output=True, timeout=10)
     assert result.returncode != 0
