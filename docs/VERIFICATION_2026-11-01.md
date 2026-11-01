@@ -20,7 +20,7 @@
 - **运行配置：**Compose 配置校验通过；先只读确认 queued/running 均 0，再仅重建 Worker。新 Worker 的 `/proc/1/comm` 为 `docker-init`，音频监督模块可加载；后端 readiness HTTP 200。
 - **实际磁盘只读对账：**扫描完整、活动任务 0、扫描错误 0，暂存/待提交 part/UUID 孤立文件均 0；此前 9 个未归属文件共 6,798,912 字节仍保留。故障媒体和测试 SQLite 均在测试私有临时目录。
 
-GitHub 同步和 CI 结果待实际完成后补充。
+功能提交 `fe52987` 已同步 GitHub，[CI 41295419944](https://github.com/17-chen/videomind-ai/actions/runs/41295419944) 后端与前端均通过。远端覆盖后端测试/Ruff、隔离 hash 检索基线，以及正常安装布局的前端 build/typecheck/lint；不代表真实模型或部署验收。
 
 ## 未验收边界
 
