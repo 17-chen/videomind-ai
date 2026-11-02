@@ -235,3 +235,5 @@ Stop the stack with `docker compose --profile app down`. Preserve the PostgreSQL
 - [Previous README, historical reference (中文)](docs/archive/README.before-bilingual.zh-CN.md)
 
 The overview is maintained in English and Chinese. Deeper engineering records are currently primarily Chinese and are labeled accordingly. Bug reports and documentation improvements in either language are welcome.
+
+[Deployment timing, configuration checks, and acceptance gates](docs/DEPLOYMENT_READINESS.md)

@@ -235,3 +235,5 @@ npm run dev
 - [此前 README 历史存档](docs/archive/README.before-bilingual.zh-CN.md)
 
 两份首页维护中英文版本；更深入的工程记录仍主要为中文，英文首页已标注其语言。欢迎中英文反馈和文档改进。
+
+[部署时机、配置预检与线上验收](docs/DEPLOYMENT_READINESS.md)

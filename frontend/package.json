@@ -7,7 +7,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:deployment": "node scripts/check-deployment.mjs",
+    "build:deploy": "npm run check:deployment && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
