@@ -17,7 +17,7 @@
 - **当前本机只读预检：**`python -m scripts.check_deployment` 返回 `blocked`、退出 2，是开发 demo/localhost/未接 Supabase 环境的预期结果，不是功能失败。没有进行网络验证或配置修改；主密钥只验证格式，没有据此宣称真实密文可恢复。
 - **源码和差异检查：**部署 guard 不引入前端 UI 技术提示；普通 dev/build 保持原行为。Git 差异空白检查通过；现有后端 readiness HTTP 200。
 
-GitHub 同步与 CI 结果在实际完成后补充。
+功能提交 `28fcc6f` 已同步 GitHub，[CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过。远端覆盖后端测试/Ruff、隔离 hash 检索基线，以及前端新增部署保护用例、正常安装布局 build/typecheck/lint；不代表真实服务或部署验收。
 
 ## 部署判断与尚缺验收
 

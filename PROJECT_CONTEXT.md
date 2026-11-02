@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-11-02 补充：**R9 新增只读部署配置预检、前端 Vercel 构建保护和无凭证环境模板。后端 180 项测试/Ruff，前端 4 项部署保护用例及临时副本 build:deploy/typecheck/lint 通过；构建使用虚构配置，不代表真实服务验收。本机预检按预期返回 blocked，未修改当前环境。当前可准备受保护预发布，公开使用前须完成真实双用户、本人模型闭环和共享持久存储；Render 磁盘不能跨服务共享，现有 API/Worker 不能直接拆成两块独立盘。见 [部署时机](docs/DEPLOYMENT_READINESS.md) 与 [本轮核查](docs/VERIFICATION_2026-11-02.md)。
+**2026-11-02 补充：**功能提交 `28fcc6f` 已同步 GitHub，[CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过。R9 新增只读部署配置预检、前端 Vercel 构建保护和无凭证环境模板。后端 180 项测试/Ruff，前端 4 项部署保护用例及临时副本 build:deploy/typecheck/lint 通过；构建使用虚构配置，不代表真实服务验收。本机预检按预期返回 blocked，未修改当前环境。当前可准备受保护预发布，公开使用前须完成真实双用户、本人模型闭环和共享持久存储；Render 磁盘不能跨服务共享，现有 API/Worker 不能直接拆成两块独立盘。见 [部署时机](docs/DEPLOYMENT_READINESS.md) 与 [本轮核查](docs/VERIFICATION_2026-11-02.md)。
 
 **2026-11-01 补充：**功能提交 `fe52987` 已同步 GitHub，[CI 41295419944](https://github.com/17-chen/videomind-ai/actions/runs/41295419944) 后端与前端均通过。R5/R8 新增 Linux 音频进程随 Worker 退出保护；真实 ffmpeg 在 SIGKILL/SIGTERM 后停止，超时清理与过期租约重试通过。队列使用隔离 SQLite，ASR 返回为模拟，未访问外部服务。后端 146 项测试/Ruff、前端临时副本 build/typecheck/lint 通过，见 [本轮核查](docs/VERIFICATION_2026-11-01.md)。遗留暂存文件不自动删除，下载合并子进程和长期多实例仍待验收。
 
