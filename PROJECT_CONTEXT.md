@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-11-02。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-03。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
@@ -27,13 +27,15 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 - 后端：Python 3.12、FastAPI、SQLAlchemy、Alembic、LangGraph。
 - 数据：PostgreSQL 保存用户、视频、转写、摘要和向量映射；本地目录保存视频、音频和笔记。
 - 视频：yt-dlp 下载、字幕优先，缺字幕时抽取音频；默认 `ASR_PROVIDER=disabled`，可选安装本地 faster-whisper 或使用用户的 OpenAI 转写 Key。
-- AI：DeepSeek 默认用于分析和回答；默认 `local_hash` embedding + ChromaDB 提供基础 RAG 流程，可选本地中文 BGE 模型与分段索引。
+- AI：DeepSeek 默认用于分析和回答；默认 `local_hash` embedding + ChromaDB 提供基础 RAG 流程，新增可选共享 pgvector 后端，可选本地中文 BGE 模型与分段索引。
 - 认证：默认 demo user；Supabase 注册登录及后端 Auth 服务令牌验证代码正在接入。
 - 本地编排：Docker Compose 默认启动 PostgreSQL、Adminer、backend、frontend；Chroma 使用后端嵌入式持久化，独立服务是可选 profile。
 
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-11-03 补充：**R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。
 
 **2026-11-02 补充：**功能提交 `28fcc6f` 已同步 GitHub，[CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过。R9 新增只读部署配置预检、前端 Vercel 构建保护和无凭证环境模板。后端 180 项测试/Ruff，前端 4 项部署保护用例及临时副本 build:deploy/typecheck/lint 通过；构建使用虚构配置，不代表真实服务验收。本机预检按预期返回 blocked，未修改当前环境。当前可准备受保护预发布，公开使用前须完成真实双用户、本人模型闭环和共享持久存储；Render 磁盘不能跨服务共享，现有 API/Worker 不能直接拆成两块独立盘。见 [部署时机](docs/DEPLOYMENT_READINESS.md) 与 [本轮核查](docs/VERIFICATION_2026-11-02.md)。
 

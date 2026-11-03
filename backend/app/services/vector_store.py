@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 from typing import Any
 
@@ -13,20 +12,10 @@ from app.core.errors import ApiError
 from app.core.i18n import t
 from app.core.logging import logger
 from app.services.embeddings import current_embedding_service
-
-DOCUMENT_CHUNK_SIZE = 350
-DOCUMENT_CHUNK_OVERLAP = 60
-DOCUMENT_CANDIDATE_MULTIPLIER = 5
-
-
-@dataclass(frozen=True)
-class VectorSearchResult:
-    video_id: str
-    title: str
-    url: str
-    category: str | None
-    document: str
-    distance: float | None
+from app.services.vector_documents import (
+    DOCUMENT_CHUNK_SIZE, DOCUMENT_CHUNK_OVERLAP, DOCUMENT_CANDIDATE_MULTIPLIER,
+    VectorSearchResult, split_document as _split_document,
+)
 
 
 class ChromaVectorStore:
@@ -189,20 +178,13 @@ def _video_filter(user_id: str, video_id: str) -> dict[str, Any]:
     return {"$and": [{"user_id": user_id}, {"video_id": video_id}]}
 
 
-def _split_document(
-    document: str, chunk_size: int = DOCUMENT_CHUNK_SIZE, overlap: int = DOCUMENT_CHUNK_OVERLAP,
-) -> list[str]:
-    text = document.strip()
-    if not text:
-        return [document]
-    chunks = []
-    step = chunk_size - overlap
-    for start in range(0, len(text), step):
-        chunk = text[start:start + chunk_size]
-        chunks.append(chunk)
-        if start + chunk_size >= len(text):
-            break
-    return chunks
+def create_vector_store():
+    if settings.vector_store_backend == "chroma":
+        return ChromaVectorStore()
+    if settings.vector_store_backend == "pgvector":
+        from app.services.pgvector_store import PgVectorStore
+        return PgVectorStore()
+    raise ValueError("VECTOR_STORE_BACKEND must be chroma or pgvector")
 
 
-vector_store = ChromaVectorStore()
+vector_store = create_vector_store()

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://videomind:videomind_dev_password@postgres:5432/videomind"
     auto_create_database_tables: bool = True
 
+    vector_store_backend: str = "chroma"
     chroma_mode: str = "embedded"
     chroma_persist_dir: str = "/app/storage/chroma"
     chroma_host: str = "chroma"

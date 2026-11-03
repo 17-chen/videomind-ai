@@ -90,6 +90,7 @@ def check_configuration(config: 'Settings', frontend: Mapping[str, str]) -> dict
 
     checks: dict[str, bool] = {}
     checks['production_mode'] = config.is_production
+    checks['supported_vector_backend'] = config.vector_store_backend in ('chroma', 'pgvector')
     checks['supabase_auth_mode'] = config.auth_mode.lower() == 'supabase'
     supabase = public_origin(config.supabase_url)
     checks['backend_supabase_https_origin'] = supabase is not None
@@ -138,7 +139,7 @@ def check_configuration(config: 'Settings', frontend: Mapping[str, str]) -> dict
     checks['absolute_storage_paths'] = all(
         Path(getattr(config, f'{kind}_storage_dir')).is_absolute()
         for kind in ('video', 'audio', 'transcript', 'note')
-    ) and (config.chroma_mode != 'embedded' or Path(config.chroma_persist_dir).is_absolute())
+    ) and (config.vector_store_backend != 'chroma' or config.chroma_mode != 'embedded' or Path(config.chroma_persist_dir).is_absolute())
     checks['disk_free_space_floor_enabled'] = config.min_media_free_space_mb > 0
     warnings = []
     if config.asr_provider == 'disabled':

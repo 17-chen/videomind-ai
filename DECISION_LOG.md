@@ -2,6 +2,13 @@
 
 只记录影响长期维护的决策；保留被替代的历史记录。
 
+## 2026-11-03 — pgvector 采用可选独立迁移，保留默认 Chroma
+
+- 沿用已有 PostgreSQL/SQLAlchemy，通过参数化 SQL 和 pgvector 类型/余弦算子实现共享向量，无新 Python 依赖。默认继续 Chroma，不因部署准备自动转换当前数据。
+- pgvector 扩展和分段表使用独立 Alembic 环境及 `alembic_version_pgvector`；显式 `prepare_pgvector --apply` 执行。避免强制所有现有普通 PostgreSQL/Chroma 环境安装扩展或条件式跳过后无法再启用。
+- 同视频写入在独立向量事务内锁视频、替换全量分段；删除兼容业务 Session 已持有的视频锁，不在第二个连接重复获取该锁。精确 SQL 按用户/模型过滤并在 SQL 去重；先保留准确性，再凭负载证据引入近似索引。
+- 表仅供可信后端角色使用：启用 RLS、撤销 PUBLIC/存在的客户端角色默认权限；不把这等同于已配置真实 Supabase 用户 JWT 的 RLS policy。对象存储、业务/向量跨事务、旧 Chroma 副本清理及目标角色权限仍需验收，见 `docs/PGVECTOR.md`。
+
 ## 2026-11-02 — 部署配置检查与真实验收分离，禁止假设跨服务磁盘共享
 
 - 保留 Vercel + Render + Supabase 路线；前端部署使用先检查后构建的命令，普通开发构建不变。后端只读预检不访问服务/数据库、不生成密钥、不迁移文件，仅输出固定标识和布尔值；配置通过始终不等于可公开使用。
