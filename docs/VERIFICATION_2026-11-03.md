@@ -22,7 +22,7 @@
 - **前端：**临时源码副本的 build/typecheck/lint 及 4 项部署保护用例通过；Next.js 16.4.3，未覆盖开发 `.next`。依赖软链接导致 standalone tracing 的 27 个文件在临时根外提示仍存在，临时产物不作为部署镜像。
 - **运行核对：**当前后端配置仍为 chroma、readiness HTTP 200、业务 Alembic 仍为 `20261024_0008`。未将现有 API/Worker 切到 pgvector。
 
-GitHub 同步和 CI 结果在实际完成后补充。
+功能提交 `f3ba87e` 已同步 GitHub，[CI 41614700666](https://github.com/17-chen/videomind-ai/actions/runs/41614700666) 后端与前端均通过。远端包含新 pgvector 实测、后端/Ruff、隔离 hash 检索及前端部署保护/build/typecheck/lint；不代表真实云服务验收。本轮 tmpfs 测试容器已停止并删除，现有业务容器与数据卷保留。
 
 ## 未验收边界与下一步
 

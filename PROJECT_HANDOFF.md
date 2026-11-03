@@ -4,7 +4,7 @@
 
 ## 1. 先读摘要
 
-**2026-11-03 更新：**R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。原有两项未跟踪文件保留。
+**2026-11-03 更新：**功能提交 `f3ba87e` 已同步 GitHub，[CI 41614700666](https://github.com/17-chen/videomind-ai/actions/runs/41614700666) 后端与前端均通过。R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。原有两项未跟踪文件保留。
 
 **2026-11-02 更新：**功能提交 `28fcc6f` 已同步 GitHub，[CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过。R9 新增只读部署配置预检、前端 Vercel 构建保护和无凭证环境模板。后端 180 项测试/Ruff，前端 4 项部署保护用例及临时副本 build:deploy/typecheck/lint 通过；构建使用虚构配置，不代表真实服务验收。本机预检按预期返回 blocked，未修改当前环境。当前可准备受保护预发布，公开使用前须完成真实双用户、本人模型闭环和共享持久存储；Render 磁盘不能跨服务共享，现有 API/Worker 不能直接拆成两块独立盘。见 [部署时机](docs/DEPLOYMENT_READINESS.md) 与 [本轮核查](docs/VERIFICATION_2026-11-02.md)。原有两项未跟踪文件保留。
 
@@ -26,7 +26,7 @@
 - **交接时 Git 基线：**2026-10-27 已快进合入 GitHub 并行文档提交 `41d743d`（中英文 README）；此前功能与恢复预检提交为 `1242761`，CI 记录提交为 `5b19d36`。交接文档自身提交后，以新聊天实际 `git status`、`git log` 为准。原有未跟踪 `outputs/` 保留不动。
 - **最新后端证据：**2026-11-03，pgvector 适配及全量回归；204 项后端测试（含真实 PostgreSQL 并发）及 Ruff 通过，见 [核查](docs/VERIFICATION_2026-11-03.md)。2026-10-27 只读密钥预检仍为 0 条密文、`inconclusive`，真实恢复未验收。
 - **最新前端证据：**2026-11-03 新增错误双语文案，当前源码隔离 build/typecheck/lint 及 4 项部署保护检查通过；实际预览版本 16.4.3 与四页 HTTP 200 是 2026-10-30 的运行证据；2026-10-25 的独立生产镜像与 `/auth` HTTP 检查为此前证据，临时副本不作为部署镜像。
-- **自动检查：**本轮功能提交 `28fcc6f` 的 [GitHub CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过；上一轮目录权限失败与修复保留在 [2026-10-29 核查](docs/VERIFICATION_2026-10-29.md)。
+- **自动检查：**本轮功能提交 `f3ba87e` 的 [GitHub CI 41614700666](https://github.com/17-chen/videomind-ai/actions/runs/41614700666) 后端与前端均通过；上一轮目录权限失败与修复保留在 [2026-10-29 核查](docs/VERIFICATION_2026-10-29.md)。
 - **2026-10-22 本地模型证据：**独立镜像的可选依赖与 `pip check` 通过；faster-whisper base 已转写合成中文音频及一个 NASA 真实公开视频。后者的 URL 下载、本地上传、无字幕缺 Key 失败路径在隔离数据库通过；真实 BGE 在固定虚构语料上完成隔离检索，详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
 - **下一步：**优先继续 R6 媒体/笔记对象存储适配与隔离验证，落实部署共享文件；不依赖外部账号时也可推进 R8 并发/合并空间预留、可恢复孤立文件清理及生产统一流量边界（只读聚合对账已补）（正式文件总量与本地认证前限流已有实现），并继续 R1 中文自然语音、跨主题检索与引用评测，R5 真实媒体故障演练。R2 真实分析/问答、R7 双用户和 R6/R9 云端验收需相应账号、资源或本人模型配置。
 - **本轮未完成的验收：**中文自然语音质量、真实笔记/向量/问答、Supabase/服务商调用和多实例运行仍待验证；英文公开视频的 72.73% Recall@2 也不是完整服务质量验收。

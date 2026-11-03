@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-11-03 补充：**R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。
+**2026-11-03 补充：**功能提交 `f3ba87e` 已同步 GitHub，[CI 41614700666](https://github.com/17-chen/videomind-ai/actions/runs/41614700666) 后端与前端均通过。R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。
 
 **2026-11-02 补充：**功能提交 `28fcc6f` 已同步 GitHub，[CI 41428541351](https://github.com/17-chen/videomind-ai/actions/runs/41428541351) 后端与前端均通过。R9 新增只读部署配置预检、前端 Vercel 构建保护和无凭证环境模板。后端 180 项测试/Ruff，前端 4 项部署保护用例及临时副本 build:deploy/typecheck/lint 通过；构建使用虚构配置，不代表真实服务验收。本机预检按预期返回 blocked，未修改当前环境。当前可准备受保护预发布，公开使用前须完成真实双用户、本人模型闭环和共享持久存储；Render 磁盘不能跨服务共享，现有 API/Worker 不能直接拆成两块独立盘。见 [部署时机](docs/DEPLOYMENT_READINESS.md) 与 [本轮核查](docs/VERIFICATION_2026-11-02.md)。
 
