@@ -21,7 +21,7 @@
 
 - **运行核对/清理：**本机 readiness 为 HTTP 200，database/vector_store 均 ok；只读核对业务 revision 为 `20261024_0008`、对象账本不存在、向量仍为 chroma。仅本轮 tmpfs 测试数据库容器在完成测试后停止删除，前端检查容器自动退出删除，所有既有卷与业务容器保留。最终扩大 SQL 异常脱敏范围后，39 项对象专项及 Ruff 复验通过。
 
-同步前最近三次 GitHub CI 均为 success，包含基线 `6040e6d` 的 [41828806883](https://github.com/17-chen/videomind-ai/actions/runs/41828806883)；本轮提交结果待推送后补记。
+同步前最近三次 GitHub CI 均为 success，包含基线 `6040e6d` 的 [41828806883](https://github.com/17-chen/videomind-ai/actions/runs/41828806883)。本轮功能提交 `b04ac37` 已同步 GitHub，[CI 41835276579](https://github.com/17-chen/videomind-ai/actions/runs/41835276579) 后端与前端均通过，覆盖真实 SQL 并发/账本、Ruff、隔离 hash 检索与前端全部检查。后续仅补验证记录。
 
 ## 未验收与下一步
 

@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-11-04 补充：**R6 新增私有对象传输与版本账本基础：不可变键、摘要校验、用户归属、失败保留旧版和独立显式迁移；业务上传/Worker/编辑读取/删除尚未接入，当前仍用本地文件。244 项后端测试及 Ruff 通过，含真实本地 HTTP 和一次性 PostgreSQL 并发；Supabase 响应/身份仍是模拟，云端验收未完成。见 [对象基础说明](docs/OBJECT_STORAGE.md) 与 [本轮核查](docs/VERIFICATION_2026-11-04.md)。
+**2026-11-04 补充：**功能提交 `b04ac37` 已同步 GitHub，[CI 41835276579](https://github.com/17-chen/videomind-ai/actions/runs/41835276579) 后端与前端均通过。R6 新增私有对象传输与版本账本基础：不可变键、摘要校验、用户归属、失败保留旧版和独立显式迁移；业务上传/Worker/编辑读取/删除尚未接入，当前仍用本地文件。244 项后端测试及 Ruff 通过，含真实本地 HTTP 和一次性 PostgreSQL 并发；Supabase 响应/身份仍是模拟，云端验收未完成。见 [对象基础说明](docs/OBJECT_STORAGE.md) 与 [本轮核查](docs/VERIFICATION_2026-11-04.md)。
 
 **2026-11-03 补充：**功能提交 `f3ba87e` 已同步 GitHub，[CI 41614700666](https://github.com/17-chen/videomind-ai/actions/runs/41614700666) 后端与前端均通过。R6 新增可选 PostgreSQL/pgvector 共享向量后端，默认仍为 Chroma。独立显式迁移、按用户/模型隔离、分段去重、事务替换和跨模型删除已有本地真实 SQL 证据；未切换现有环境。后端 204 项测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过。真实 PostgreSQL/pgvector 不等于真实 Supabase 验收，BGE 分段用模拟向量；媒体对象存储、云端角色/持久性与真实模型闭环仍待做。见 [pgvector 说明](docs/PGVECTOR.md) 和 [本轮核查](docs/VERIFICATION_2026-11-03.md)。
 
