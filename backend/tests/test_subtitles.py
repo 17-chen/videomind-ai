@@ -16,6 +16,20 @@ def test_parse_webvtt_omits_timestamps_without_hours(tmp_path):
     assert _parse_subtitle_text(subtitle) == "Hello world\nA later caption"
 
 
+def test_parse_webvtt_omits_metadata_blocks(tmp_path):
+    subtitle = tmp_path / "video.en.vtt"
+    subtitle.write_text(
+        "WEBVTT\n\n"
+        "NOTE Captions supplied by a provider\nThis is not spoken.\n\n"
+        "STYLE\n::cue { color: yellow; }\n\n"
+        "REGION\nid:main\n\n"
+        "00:00.000 --> 00:01.000\nSpoken caption\n",
+        encoding="utf-8",
+    )
+
+    assert _parse_subtitle_text(subtitle) == "Spoken caption"
+
+
 def test_prefers_chinese_subtitles_and_falls_back_from_empty_file(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "video_storage_dir", str(tmp_path))
     monkeypatch.setattr(settings, "transcript_storage_dir", str(tmp_path / "transcripts"))

@@ -11,6 +11,7 @@ TIMESTAMP_PATTERN = re.compile(
     r"^(?:\d{2}:)?\d{2}:\d{2}[,.]\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}[,.]\d{3}"
 )
 WEBVTT_PATTERN = re.compile(r"^WEBVTT|^Kind:|^Language:", re.IGNORECASE)
+WEBVTT_METADATA_BLOCK = re.compile(r"^(?:NOTE(?:\s|$)|STYLE$|REGION$)", re.IGNORECASE)
 TAG_PATTERN = re.compile(r"<[^>]+>")
 SUBTITLE_LANGUAGES = ("zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh", "en")
 
@@ -45,11 +46,20 @@ def find_downloaded_subtitles(video_id: str) -> SubtitleResult | None:
 def _parse_subtitle_text(path: Path) -> str:
     raw_text = path.read_text(encoding="utf-8", errors="ignore")
     lines: list[str] = []
+    at_block_start = True
+    skip_metadata = False
 
     for raw_line in raw_text.splitlines():
         line = raw_line.strip()
         if not line:
+            at_block_start = True
+            skip_metadata = False
             continue
+        if at_block_start and WEBVTT_METADATA_BLOCK.match(line):
+            skip_metadata = True
+        if skip_metadata:
+            continue
+        at_block_start = False
         if line.isdigit() or TIMESTAMP_PATTERN.search(line) or WEBVTT_PATTERN.search(line):
             continue
 
