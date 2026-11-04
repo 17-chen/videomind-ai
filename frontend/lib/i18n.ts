@@ -1,6 +1,8 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "文件存储暂不可用，请稍后重试": ["文件存储暂不可用，请稍后重试", "File storage is temporarily unavailable. Please try again later."],
+  "文件完整性校验失败，请稍后重试": ["文件完整性校验失败，请稍后重试", "File integrity verification failed. Please try again later."],
   "知识库暂不可用，请稍后重试": ["知识库暂不可用，请稍后重试", "The knowledge library is temporarily unavailable. Please try again later."],
   "知识库索引生成失败，请稍后重试": ["知识库索引生成失败，请稍后重试", "The knowledge library could not be indexed. Please try again later."],
   "本次处理的临时文件超过大小上限，请使用较小的视频": ["本次处理的临时文件超过大小上限，请使用较小的视频", "Temporary processing files exceed the size limit. Please use a smaller video."],

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     auth_mode: str = "demo"
     supabase_url: str = ""
     supabase_anon_key: str = ""
+    supabase_storage_service_key: str = ""
+    supabase_storage_bucket: str = "videomind-private"
 
     database_url: str = "postgresql+psycopg://videomind:videomind_dev_password@postgres:5432/videomind"
     auto_create_database_tables: bool = True
