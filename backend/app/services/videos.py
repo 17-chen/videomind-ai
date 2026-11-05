@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import status
 from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.errors import ApiError
@@ -16,6 +17,8 @@ from app.schemas.video import VideoCreate, VideoNoteUpdate, VideoUpdate
 from app.services.analysis import _persist_markdown_note
 from app.services.rag import index_video
 from app.services.storage_quota import generate_artifacts
+from app.services.object_storage.cleanup import stage_video_deletion
+from app.services.object_storage.spec import UNAVAILABLE
 from app.services.vector_store import vector_store
 
 
@@ -226,9 +229,18 @@ def delete_video_for_user(db: Session, user: User, video_id: str) -> None:
 
     # Keep the database row until the user's Chroma entry has been removed.
     # The vector ID is deterministic, so this also cleans up an index whose DB write failed.
-    vector_store.delete_video_document(vector_id=f"video:{video.id}", user_id=user.id)
-    db.delete(video)
-    db.commit()
+    try:
+        stage_video_deletion(db, video)
+        vector_store.delete_video_document(vector_id=f"video:{video.id}", user_id=user.id)
+        db.delete(video)
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Video deletion database error type={}", type(exc).__name__)
+        raise ApiError(UNAVAILABLE, status.HTTP_503_SERVICE_UNAVAILABLE) from None
+    except Exception:
+        db.rollback()
+        raise
     _cleanup_video_files(video_id)
 
 

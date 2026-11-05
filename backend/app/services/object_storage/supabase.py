@@ -81,10 +81,10 @@ class SupabaseObjectStore:
             except (ValueError, AttributeError):
                 raise ApiError(UNAVAILABLE, 503) from None
 
-    def _validate(self, spec: ArtifactSpec):
+    def _validate(self, spec: ArtifactSpec, *, check_size=True):
         if spec.bucket != self.bucket or spec.project_fingerprint != self.project_fingerprint:
             raise ApiError(UNAVAILABLE, 503)
-        if spec.size_bytes > stage_limit_bytes():
+        if check_size and spec.size_bytes > stage_limit_bytes():
             raise ApiError('本次处理的临时文件超过大小上限，请使用较小的视频', 413)
         self._private_bucket()
 
@@ -149,7 +149,9 @@ class SupabaseObjectStore:
                 temporary.unlink(missing_ok=True)
 
     def delete(self, spec: ArtifactSpec):
-        self._validate(spec)
+        # Deleting a remote object allocates no media cache; a lower local stage
+        # limit must not prevent removing previously accepted larger objects.
+        self._validate(spec, check_size=False)
         with self._request('DELETE', f'/object/{self.bucket}', json={'prefixes': [spec.object_key]}) as response:
             if response.status_code not in (200, 204, 404):
                 raise ApiError(UNAVAILABLE, 503)

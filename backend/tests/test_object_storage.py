@@ -401,3 +401,258 @@ def test_optional_prepare_failure_hides_database_error(monkeypatch, capsys):
     monkeypatch.setattr(command, 'upgrade', fail)
     assert prepare_main(['--apply']) == 1
     assert 'private-database-sentinel' not in capsys.readouterr().out
+
+
+def delete_business_video(db, owner, video, monkeypatch):
+    from app.services import videos
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            pass
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    videos.delete_video_for_user(db, db.get(User, owner), video)
+
+
+def test_business_delete_creates_intent_and_cleanup_retries_exact_object(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects, cleanup_snapshot
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'private-content')
+    spec = publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    assert db.get(Video, video) is None
+    row = db.get(StoredArtifact, spec.id)
+    assert row.state == 'retired' and row.delete_requested is True
+    assert cleanup_snapshot(db)['eligible'] == 1
+    report = cleanup_requested_objects(db, store=store)
+    assert report['status'] == 'complete' and report['confirmed_deleted'] == 1
+    assert db.get(StoredArtifact, spec.id).state == 'deleted'
+    assert not store.objects
+    assert cleanup_requested_objects(db, store=store)['attempted'] == 0
+
+
+def test_pending_uncertain_upload_is_never_purged_after_video_delete(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'private-content')
+    store.fail_after_upload = True
+    with pytest.raises(ApiError):
+        publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    report = cleanup_requested_objects(db, store=store)
+    assert report['status'] == 'needs_attention'
+    assert report['pending_uncertain'] == 1 and report['attempted'] == 0
+    assert len(store.objects) == 1
+    row = db.scalar(select(StoredArtifact))
+    assert row.state == 'pending' and row.delete_requested is True
+
+
+def test_cleanup_does_not_infer_authorization_from_missing_video(ledger, tmp_path):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    spec = publish(db, alice, video, path, store)
+    # Simulate a direct SQL/business deletion, bypassing the supported route.
+    db.delete(db.get(Video, video))
+    db.commit()
+    assert cleanup_requested_objects(db, store=store)['attempted'] == 0
+    assert spec.object_key in store.objects
+    assert db.get(StoredArtifact, spec.id).state == 'ready'
+
+
+def test_existing_video_blocks_cleanup_even_with_inconsistent_intent(ledger, tmp_path):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    spec = publish(db, alice, video, path, store)
+    row = db.get(StoredArtifact, spec.id)
+    row.state, row.delete_requested = 'retired', True
+    db.commit()
+    report = cleanup_requested_objects(db, store=store)
+    assert report['blocked'] == 1 and report['attempted'] == 0
+    assert spec.object_key in store.objects
+
+
+def test_uncertain_remote_delete_keeps_intent_for_retry(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    spec = publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    original = store.delete
+    def unknown(spec):
+        original(spec)
+        raise ApiError('private-provider-sentinel', 503)
+    monkeypatch.setattr(store, 'delete', unknown)
+    result = cleanup_requested_objects(db, store=store)
+    assert result['failed'] == 1 and result['confirmed_deleted'] == 0
+    assert db.get(StoredArtifact, spec.id).state == 'retired'
+    assert not store.objects
+    monkeypatch.setattr(store, 'delete', original)
+    assert cleanup_requested_objects(db, store=store)['confirmed_deleted'] == 1
+
+
+def test_cleanup_database_failure_after_remote_delete_is_retryable(ledger, tmp_path, monkeypatch):
+    from sqlalchemy.exc import SQLAlchemyError
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    spec = publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    commit = db.commit
+    def fail():
+        raise SQLAlchemyError('private-database-sentinel')
+    monkeypatch.setattr(db, 'commit', fail)
+    report = cleanup_requested_objects(db, store=store)
+    assert report['failed'] == 1 and report['eligible'] == 1
+    assert db.get(StoredArtifact, spec.id).state == 'retired'
+    monkeypatch.setattr(db, 'commit', commit)
+    assert cleanup_requested_objects(db, store=store)['confirmed_deleted'] == 1
+
+
+def test_cleanup_batch_limit_and_invalid_limit(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, store = ledger
+    for suffix in ('.md', '.txt'):
+        path = tmp_path / f'{video}{suffix}'
+        path.write_bytes(b'content')
+        publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    result = cleanup_requested_objects(db, store=store, limit=1)
+    assert result['confirmed_deleted'] == 1 and result['eligible'] == 1
+    assert len(store.objects) == 1
+    with pytest.raises(ValueError):
+        cleanup_requested_objects(db, store=store, limit=0)
+
+
+def test_cleanup_cli_default_is_read_only_and_never_creates_provider(ledger, tmp_path, monkeypatch, capsys):
+    from sqlalchemy import event
+    from scripts import cleanup_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    engine = db.get_bind()
+    monkeypatch.setattr(cleanup_objects, 'SessionLocal', lambda: Session(engine))
+    monkeypatch.setattr(cleanup_objects.SupabaseObjectStore, 'from_settings', lambda: pytest.fail('No provider in preview'))
+    def read_only(conn, cursor, statement, *args):
+        assert not statement.lstrip().upper().startswith(('UPDATE', 'INSERT', 'DELETE', 'CREATE', 'ALTER', 'DROP'))
+    event.listen(engine, 'before_cursor_execute', read_only)
+    try:
+        assert cleanup_objects.main([]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report['eligible'] == 1 and report['writes_performed'] is False
+        assert video not in json.dumps(report)
+    finally:
+        event.remove(engine, 'before_cursor_execute', read_only)
+
+
+def test_cleanup_cli_apply_reports_aggregates_and_closes_provider(ledger, tmp_path, monkeypatch, capsys):
+    from scripts import cleanup_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    monkeypatch.setattr(cleanup_objects, 'SessionLocal', lambda: Session(db.get_bind()))
+    closed = []
+    store.close = lambda: closed.append(True)
+    monkeypatch.setattr(cleanup_objects.SupabaseObjectStore, 'from_settings', lambda: store)
+    assert cleanup_objects.main(['--apply']) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['confirmed_deleted'] == 1 and report['writes_performed'] is True
+    assert closed == [True]
+    assert not ({video, alice} & set(json.dumps(report).split()))
+
+
+def test_cleanup_cli_failure_never_prints_raw_error(monkeypatch, capsys):
+    from scripts import cleanup_objects
+    def fail():
+        raise RuntimeError('private-database-sentinel')
+    monkeypatch.setattr(cleanup_objects, 'SessionLocal', fail)
+    assert cleanup_objects.main([]) == 2
+    assert 'private-database-sentinel' not in capsys.readouterr().out
+
+
+def test_cleanup_transport_requires_confirmed_absence_before_marking_deleted(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    db, alice, _, video, memory = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    spec = publish(db, alice, video, path, memory)
+    delete_business_video(db, alice, video, monkeypatch)
+    confirmed = False
+    def handler(request):
+        if request.method == 'DELETE':
+            assert json.loads(request.read()) == {'prefixes': [spec.object_key]}
+            return response(200)
+        return response(404 if confirmed else 200)
+    store = client(handler)
+    try:
+        report = cleanup_requested_objects(db, store=store)
+        assert report['failed'] == 1 and report['confirmed_deleted'] == 0
+        assert db.get(StoredArtifact, spec.id).state == 'retired'
+        confirmed = True
+        report = cleanup_requested_objects(db, store=store)
+        assert report['confirmed_deleted'] == 1
+    finally:
+        store.close()
+
+
+def test_cleanup_apply_skips_uncertain_without_even_creating_provider(ledger, tmp_path, monkeypatch, capsys):
+    from scripts import cleanup_objects
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    store.fail_after_upload = True
+    with pytest.raises(ApiError):
+        publish(db, alice, video, path, store)
+    delete_business_video(db, alice, video, monkeypatch)
+    monkeypatch.setattr(cleanup_objects, 'SessionLocal', lambda: Session(db.get_bind()))
+    monkeypatch.setattr(cleanup_objects.SupabaseObjectStore, 'from_settings', lambda: pytest.fail('Pending is not safe to purge'))
+    assert cleanup_objects.main(['--apply']) == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report['pending_uncertain'] == 1 and report['attempted'] == 0 and report['writes_performed'] is False
+
+
+def test_publish_does_not_revive_requested_object_even_if_video_still_exists(ledger, tmp_path):
+    db, alice, _, video, store = ledger
+    path = tmp_path / f'{video}.md'
+    path.write_bytes(b'content')
+    put = store.put
+    def requested(spec, path):
+        put(spec, path)
+        # Simulate an administrative restore with the same video ID after intent.
+        with Session(db.get_bind()) as other:
+            row = other.get(StoredArtifact, spec.id)
+            row.delete_requested = True
+            other.commit()
+    store.put = requested
+    with pytest.raises(ApiError) as error:
+        publish(db, alice, video, path, store)
+    assert error.value.status_code == 404
+    row = db.scalar(select(StoredArtifact))
+    assert row.state == 'pending' and row.delete_requested is True
+
+
+def test_lower_stage_limit_does_not_block_cleanup_of_previously_large_object(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'max_media_stage_mb', 1)
+    spec = replace(spec_for(), size_bytes=2 * 1024 * 1024)
+    seen = []
+    def handler(request):
+        seen.append(request.method)
+        return response(200 if request.method == 'DELETE' else 404)
+    store = client(handler)
+    try:
+        with pytest.raises(ApiError) as error:
+            store.download(spec, tmp_path / 'output')
+        assert error.value.status_code == 413 and not seen
+        store.delete(spec)
+        assert seen == ['DELETE', 'GET']
+    finally:
+        store.close()

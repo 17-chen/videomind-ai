@@ -56,6 +56,9 @@ def publish_artifact(db: Session, *, user_id: str, video_id: str, kind: str, pat
         size, checksum = measure_file(path)
         spec = ArtifactSpec(id=str(uuid4()), user_id=user_id, video_id=video_id, kind=kind, filename=path.name,
                             bucket=store.bucket, project_fingerprint=store.project_fingerprint, sha256=checksum, size_bytes=size)
+        # Register the immutable key before deletion can remove the video. The
+        # lock ends at the pending commit, BEFORE any remote transfer begins.
+        _owned_video(db, user_id, video_id, lock=True)
         row = StoredArtifact(**{name: getattr(spec, name) for name in SPEC_FIELDS}, state='pending')
         db.add(row)
         db.commit()  # Record the immutable key before an upload with unknown outcome.
@@ -63,6 +66,9 @@ def publish_artifact(db: Session, *, user_id: str, video_id: str, kind: str, pat
         if db.scalar(select(User.id).where(User.id == user_id).with_for_update()) is None:
             raise ApiError('未找到该视频', 404)
         _owned_video(db, user_id, video_id, lock=True)
+        db.refresh(row, with_for_update=True)
+        if row.delete_requested or row.state != 'pending':
+            raise ApiError('未找到该文件', 404)
         previous = db.scalar(select(StoredArtifact).where(
             StoredArtifact.user_id == user_id, StoredArtifact.video_id == video_id,
             StoredArtifact.kind == kind, StoredArtifact.filename == path.name, StoredArtifact.state == 'ready',

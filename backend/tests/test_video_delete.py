@@ -109,3 +109,41 @@ def test_delete_rejects_active_video_and_keeps_record_when_vector_cleanup_fails(
     failed = client.delete(f"/api/v1/videos/{video_id}", headers=auth("alice"))
     assert failed.status_code == 503
     assert client.get(f"/api/v1/videos/{video_id}", headers=auth("alice")).status_code == 200
+
+
+def install_objects(engine, video_id):
+    from uuid import uuid4
+    from app.services.object_storage.models import ArtifactBase, StoredArtifact
+    ArtifactBase.metadata.create_all(engine)
+    with Session(engine) as db:
+        video = db.get(Video, video_id)
+        rows = [StoredArtifact(
+            id=str(uuid4()), user_id=video.user_id, video_id=video_id, kind='note',
+            filename=f'{video_id}.md', bucket='videomind-private', project_fingerprint='a' * 64,
+            sha256='b' * 64, size_bytes=10, state=state,
+        ) for state in ('ready', 'retired', 'pending', 'deleted')]
+        db.add_all(rows)
+        db.commit()
+        return [row.id for row in rows]
+
+
+def test_delete_api_scopes_and_persists_object_intent_with_business_delete(video_api):
+    from app.services.object_storage.models import StoredArtifact
+    client, engine, store, _, _ = video_api
+    video_id = create_video(client)
+    rows = install_objects(engine, video_id)
+    assert client.delete(f'/api/v1/videos/{video_id}', headers=auth('bob')).status_code == 404
+    with Session(engine) as db:
+        assert not any(db.get(StoredArtifact, key).delete_requested for key in rows)
+    store.fail = True
+    assert client.delete(f'/api/v1/videos/{video_id}', headers=auth('alice')).status_code == 503
+    with Session(engine) as db:
+        assert not any(db.get(StoredArtifact, key).delete_requested for key in rows)
+        assert db.get(StoredArtifact, rows[0]).state == 'ready'
+        assert db.get(Video, video_id) is not None
+    store.fail = False
+    assert client.delete(f'/api/v1/videos/{video_id}', headers=auth('alice')).status_code == 204
+    with Session(engine) as db:
+        assert db.get(Video, video_id) is None
+        assert [db.get(StoredArtifact, key).state for key in rows] == ['retired', 'retired', 'pending', 'deleted']
+        assert [db.get(StoredArtifact, key).delete_requested for key in rows] == [True, True, True, False]

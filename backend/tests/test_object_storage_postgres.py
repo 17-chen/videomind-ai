@@ -74,7 +74,7 @@ def test_migration_idempotent_and_backend_only(object_db):
         optional.attributes['connection'] = connection
         command.upgrade(optional, 'head')
         assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '20261024_0008'
-        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261104_o001'
+        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261105_o002'
         assert connection.scalar(text("SELECT relrowsecurity FROM pg_class WHERE oid='public.vm_storage_objects'::regclass")) is True
         for role in ('anon', 'authenticated', 'service_role'):
             for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
@@ -143,3 +143,231 @@ def test_sql_publish_failure_retains_previous_and_pending_key(object_db, tmp_pat
         assert error.value.message == '文件存储暂不可用，请稍后重试'
         assert db.get(StoredArtifact, first.id).state == 'ready'
         assert sorted(db.scalars(select(StoredArtifact.state))) == ['pending', 'ready']
+
+
+class DeletionTestStore:
+    bucket = 'videomind-private'
+    project_fingerprint = 'c' * 64
+
+    def __init__(self):
+        self.keys = set()
+        self.delete_calls = 0
+
+    def put(self, spec, path):
+        self.keys.add(spec.object_key)
+
+    def delete(self, spec):
+        self.delete_calls += 1
+        self.keys.discard(spec.object_key)
+
+
+def prepare_deleted_object(object_db, tmp_path, monkeypatch):
+    from app.services import videos
+    engine, owner, ids = object_db
+    calls = []
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            calls.append(kwargs)
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    path = tmp_path / f'{ids[0]}.md'
+    path.write_bytes(b'synthetic-content')
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        spec = publish_artifact(db, user_id=owner, video_id=ids[0], kind='note', path=path, store=store)
+        videos.delete_video_for_user(db, db.get(User, owner), ids[0])
+    return spec, store, calls
+
+
+def test_delete_and_cleanup_are_durable_across_database_sessions(object_db, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    engine, _, ids = object_db
+    spec, store, calls = prepare_deleted_object(object_db, tmp_path, monkeypatch)
+    assert len(calls) == 1 and spec.object_key in store.keys
+    with Session(engine) as restarted:
+        assert restarted.get(Video, ids[0]) is None
+        row = restarted.get(StoredArtifact, spec.id)
+        assert row.delete_requested and row.state == 'retired'
+        report = cleanup_requested_objects(restarted, store=store)
+        assert report['confirmed_deleted'] == 1 and report['status'] == 'complete'
+    assert not store.keys
+
+
+def test_cleanup_workers_skip_locked_key_and_never_delete_twice(object_db, tmp_path, monkeypatch):
+    from threading import Event
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    engine, *_ = object_db
+    _, store, _ = prepare_deleted_object(object_db, tmp_path, monkeypatch)
+    entered, release = Event(), Event()
+    delete = store.delete
+    def held_delete(spec):
+        entered.set()
+        assert release.wait(timeout=10)
+        delete(spec)
+    store.delete = held_delete
+    def worker():
+        with Session(engine) as db:
+            return cleanup_requested_objects(db, store=store)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(worker)
+        try:
+            assert entered.wait(timeout=5)
+            second = pool.submit(worker)
+            assert second.result(timeout=5)['attempted'] == 0
+        finally:
+            release.set()
+        assert first.result(timeout=5)['confirmed_deleted'] == 1
+    assert store.delete_calls == 1
+
+
+def test_delete_during_upload_preserves_pending_intent_without_holding_video_lock(object_db, tmp_path, monkeypatch):
+    from threading import Event
+    from app.services import videos
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    engine, owner, ids = object_db
+    entered, release = Event(), Event()
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            pass
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    class InFlight(DeletionTestStore):
+        def put(self, spec, path):
+            entered.set()
+            assert release.wait(timeout=10)
+            super().put(spec, path)
+    store = InFlight()
+    path = tmp_path / f'{ids[0]}.md'
+    path.write_bytes(b'synthetic-inflight-content')
+    def upload():
+        with Session(engine) as db:
+            with pytest.raises(ApiError) as error:
+                publish_artifact(db, user_id=owner, video_id=ids[0], kind='note', path=path, store=store)
+            assert error.value.status_code == 404
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(upload)
+        try:
+            assert entered.wait(timeout=5)
+            with Session(engine) as db:
+                videos.delete_video_for_user(db, db.get(User, owner), ids[0])
+                report = cleanup_requested_objects(db, store=store)
+                assert report['pending_uncertain'] == 1 and report['attempted'] == 0
+        finally:
+            release.set()
+        future.result(timeout=5)
+    with Session(engine) as db:
+        row = db.scalar(select(StoredArtifact))
+        assert row.delete_requested and row.state == 'pending'
+        assert db.get(Video, ids[0]) is None
+    assert store.delete_calls == 0 and len(store.keys) == 1
+
+
+def test_deleted_video_cannot_register_pending_intent_after_measurement(object_db, tmp_path, monkeypatch):
+    from app.services import videos
+    from app.services.object_storage import repository
+    engine, owner, ids = object_db
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            pass
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    measure = repository.measure_file
+    def delete_before_register(path):
+        measured = measure(path)
+        with Session(engine) as db:
+            videos.delete_video_for_user(db, db.get(User, owner), ids[0])
+        return measured
+    monkeypatch.setattr(repository, 'measure_file', delete_before_register)
+    path = tmp_path / f'{ids[0]}.md'
+    path.write_bytes(b'synthetic-content')
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        with pytest.raises(ApiError) as error:
+            publish_artifact(db, user_id=owner, video_id=ids[0], kind='note', path=path, store=store)
+        assert error.value.status_code == 404
+        assert db.scalar(select(StoredArtifact)) is None
+    assert not store.keys
+
+
+def test_real_sql_delete_failure_rolls_back_video_and_intents(object_db, tmp_path, monkeypatch):
+    from app.services import videos
+    engine, owner, ids = object_db
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            pass
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    path = tmp_path / f'{ids[0]}.md'
+    path.write_bytes(b'synthetic-content')
+    with Session(engine) as db:
+        spec = publish_artifact(db, user_id=owner, video_id=ids[0], kind='note', path=path, store=DeletionTestStore())
+        with engine.begin() as connection:
+            connection.execute(text("CREATE FUNCTION synthetic_reject_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'private-database-sentinel'; END $$"))
+            connection.execute(text('CREATE TRIGGER synthetic_reject_delete BEFORE DELETE ON videos FOR EACH ROW EXECUTE FUNCTION synthetic_reject_delete()'))
+        with pytest.raises(ApiError) as error:
+            videos.delete_video_for_user(db, db.get(User, owner), ids[0])
+        assert error.value.status_code == 503 and 'private-database-sentinel' not in error.value.message
+        assert db.get(Video, ids[0]) is not None
+        row = db.get(StoredArtifact, spec.id)
+        assert row.state == 'ready' and row.delete_requested is False
+
+
+def test_real_sql_cleanup_failure_after_remote_delete_can_retry(object_db, tmp_path, monkeypatch):
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+    engine, *_ = object_db
+    spec, store, _ = prepare_deleted_object(object_db, tmp_path, monkeypatch)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE FUNCTION synthetic_reject_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.state = 'deleted' THEN RAISE EXCEPTION 'private-database-sentinel'; END IF; RETURN NEW; END $$"))
+        connection.execute(text('CREATE TRIGGER synthetic_reject_cleanup BEFORE UPDATE ON vm_storage_objects FOR EACH ROW EXECUTE FUNCTION synthetic_reject_cleanup()'))
+    with Session(engine) as db:
+        report = cleanup_requested_objects(db, store=store)
+        assert report['failed'] == 1 and report['eligible'] == 1
+        assert not store.keys
+        assert db.get(StoredArtifact, spec.id).state == 'retired'
+    with engine.begin() as connection:
+        connection.execute(text('DROP TRIGGER synthetic_reject_cleanup ON vm_storage_objects'))
+    with Session(engine) as db:
+        assert cleanup_requested_objects(db, store=store)['confirmed_deleted'] == 1
+    assert store.delete_calls == 2
+
+
+def test_old_ledger_schema_blocks_business_delete_before_touching_vectors(object_db, monkeypatch):
+    from app.services import videos
+    engine, owner, ids = object_db
+    calls = []
+    class Vectors:
+        def delete_video_document(self, **kwargs):
+            calls.append(True)
+    monkeypatch.setattr(videos, 'vector_store', Vectors())
+    with engine.begin() as connection:
+        optional = migration_config()
+        optional.attributes['connection'] = connection
+        command.downgrade(optional, '20261104_o001')
+    with Session(engine) as db:
+        with pytest.raises(ApiError) as error:
+            videos.delete_video_for_user(db, db.get(User, owner), ids[0])
+        assert error.value.status_code == 503
+        assert db.get(Video, ids[0]) is not None
+        assert not calls
+
+
+def test_migration_preserves_existing_row_and_blocks_losing_pending_deletion(object_db):
+    engine, owner, ids = object_db
+    with engine.begin() as connection:
+        optional = migration_config()
+        optional.attributes['connection'] = connection
+        command.downgrade(optional, '20261104_o001')
+        connection.execute(text("""INSERT INTO vm_storage_objects
+            (id,user_id,video_id,kind,filename,bucket,project_fingerprint,sha256,size_bytes,state)
+            VALUES (:id,:owner,:video,'note',:filename,'videomind-private',:fingerprint,:sha,7,'ready')"""),
+            {'id': str(uuid4()), 'owner': owner, 'video': ids[0], 'filename': f'{ids[0]}.md', 'fingerprint': 'c' * 64, 'sha': 'd' * 64})
+        command.upgrade(optional, 'head')
+    with Session(engine) as db:
+        row = db.scalar(select(StoredArtifact))
+        assert row.state == 'ready' and row.size_bytes == 7 and row.delete_requested is False
+        row.state, row.delete_requested = 'pending', True
+        db.commit()
+    with pytest.raises(RuntimeError, match='Unfulfilled'):
+        with engine.begin() as connection:
+            optional = migration_config()
+            optional.attributes['connection'] = connection
+            command.downgrade(optional, '20261104_o001')
+    with engine.connect() as connection:
+        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261105_o002'
+        assert connection.scalar(text('SELECT delete_requested FROM vm_storage_objects')) is True
