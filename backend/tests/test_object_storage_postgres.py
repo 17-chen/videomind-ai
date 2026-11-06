@@ -371,3 +371,100 @@ def test_migration_preserves_existing_row_and_blocks_losing_pending_deletion(obj
     with engine.connect() as connection:
         assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261105_o002'
         assert connection.scalar(text('SELECT delete_requested FROM vm_storage_objects')) is True
+
+
+@pytest.mark.parametrize('same_video', [False, True])
+def test_concurrent_group_publication_has_one_coherent_snapshot(object_db, tmp_path, monkeypatch, same_video):
+    import hashlib
+    from app.services.object_storage.repository import publish_artifacts
+    engine, owner, ids = object_db
+    monkeypatch.setattr(settings, 'max_user_storage_mb', 1)
+    barrier = Barrier(2)
+    class Store(DeletionTestStore):
+        first = True
+        def put(self, spec, path):
+            if self.first:
+                self.first = False
+                barrier.wait(timeout=10)
+            super().put(spec, path)
+    def upload(index):
+        video = ids[0] if same_video else ids[index]
+        root = tmp_path / str(index)
+        root.mkdir()
+        paths = [root / f'{video}{suffix}' for suffix in ('.mp4', '.en.vtt')]
+        for path in paths:
+            path.write_bytes(bytes([65 + index]) * 350000)
+        with Session(engine) as db:
+            try:
+                publish_artifacts(db, user_id=owner, video_id=video, kind='video', paths=paths, store=Store(), replace_kind=True)
+                return 200
+            except ApiError as error:
+                return error.status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(upload, range(2))) == ([200, 200] if same_video else [200, 413])
+    with Session(engine) as db:
+        rows = db.scalars(select(StoredArtifact)).all()
+        current = [row for row in rows if row.state == 'ready']
+        assert len(rows) == 4 and len(current) == 2
+        assert len({row.sha256 for row in current}) == 1
+        assert current[0].sha256 in {hashlib.sha256(value * 350000).hexdigest() for value in (b'A', b'B')}
+        assert sorted(row.state for row in rows) == (['ready', 'ready', 'retired', 'retired'] if same_video else ['pending', 'pending', 'ready', 'ready'])
+
+
+def test_group_sql_failure_rolls_back_video_reference_and_whole_group(object_db, tmp_path, monkeypatch):
+    from app.services.object_storage.references import artifact_reference
+    from app.services.object_storage.repository import publish_artifacts
+    from app.services.storage_quota import artifact_directory
+    from app.services.video_processing import pipeline
+    from app.services.video_processing.types import DownloadedVideo
+    engine, owner, ids = object_db
+    root = tmp_path / 'old'
+    root.mkdir()
+    paths = [root / f'{ids[0]}{suffix}' for suffix in ('.mp4', '.en.vtt')]
+    for path in paths:
+        path.write_bytes(b'old-group')
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        original = publish_artifacts(db, user_id=owner, video_id=ids[0], kind='video', paths=paths, store=store)
+        video = db.get(Video, ids[0])
+        video.media_path = artifact_reference(original[0].id)
+        db.commit()
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE videos ADD CONSTRAINT synthetic_reject_title CHECK (title IS DISTINCT FROM 'reject')"))
+        def download(url, video_id):
+            root = artifact_directory('video')
+            media = root / f'{video_id}.mp4'
+            media.write_bytes(b'new-video')
+            (root / f'{video_id}.zh.vtt').write_bytes(b'new-subtitle')
+            return DownloadedVideo(video_id, url, str(media), title='reject')
+        monkeypatch.setattr(pipeline, 'download_video', download)
+        with pytest.raises(ApiError) as error:
+            pipeline.process_video(db, video, object_store=store)
+        assert error.value.status_code == 503
+        assert video.media_path == artifact_reference(original[0].id)
+        assert video.title is None
+        current = db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'ready')).all()
+        assert {row.id for row in current} == {spec.id for spec in original}
+        assert len(db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'pending')).all()) == 2
+
+
+def test_note_sql_failure_keeps_old_note_and_ready_export(object_db, tmp_path):
+    from app.models import Summary
+    from app.schemas.video import VideoNoteUpdate
+    from app.services import videos
+    engine, owner, ids = object_db
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        video = db.get(Video, ids[0])
+        video.summary = Summary(summary='synthetic', markdown_note='old note')
+        db.commit()
+        videos.update_note_for_user(db, db.get(User, owner), video.id, VideoNoteUpdate(markdown_note='previous note'), object_store=store)
+        previous = db.scalar(select(StoredArtifact).where(StoredArtifact.state == 'ready')).id
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE summaries ADD CONSTRAINT synthetic_reject_note CHECK (markdown_note != 'reject note')"))
+        with pytest.raises(ApiError) as error:
+            videos.update_note_for_user(db, db.get(User, owner), video.id, VideoNoteUpdate(markdown_note='reject note'), object_store=store)
+        assert error.value.status_code == 503
+        assert video.summary.markdown_note == 'previous note'
+        assert db.scalar(select(StoredArtifact).where(StoredArtifact.state == 'ready')).id == previous
+        assert len(db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'pending')).all()) == 1

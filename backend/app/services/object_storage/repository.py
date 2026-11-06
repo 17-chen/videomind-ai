@@ -19,7 +19,8 @@ from app.core.logging import logger
 from app.models import User, Video
 from app.services.object_storage.models import StoredArtifact
 from app.services.object_storage.spec import ArtifactSpec, UNAVAILABLE, measure_file
-from app.services.storage_quota import STORAGE_LIMIT_MESSAGE
+from app.services.storage_quota import STORAGE_LIMIT_MESSAGE, user_storage_bytes
+from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, stage_limit_bytes
 
 
 SPEC_FIELDS = tuple(ArtifactSpec.__dataclass_fields__)
@@ -48,51 +49,78 @@ def _owned_artifact(db: Session, user_id: str, artifact_id: str, states):
 
 
 def publish_artifact(db: Session, *, user_id: str, video_id: str, kind: str, path: Path, store) -> ArtifactSpec:
-    """Requires a dedicated Session: commits the pending intent before remote I/O."""
+    return publish_artifacts(db, user_id=user_id, video_id=video_id, kind=kind, paths=[path], store=store)[0]
+
+
+def publish_artifacts(db: Session, *, user_id: str, video_id: str, kind: str, paths: list[Path], store,
+                      replace_kind: bool = False, on_publish=None) -> list[ArtifactSpec]:
+    """Publish one bounded group atomically; requires a clean dedicated Session.
+
+    replace_kind=True treats the files as a complete snapshot (e.g. video plus
+    subtitles), retiring names absent from the new output. Network outcomes and
+    failed SQL publication retain all pending keys and the previous ready group.
+    """
     if db.new or db.dirty or db.deleted:
         raise ValueError('Object publication requires a clean dedicated database session')
+    if not 1 <= len(paths) <= 100 or len({path.name for path in paths}) != len(paths):
+        raise ValueError('A group requires 1-100 distinct artifact filenames')
     try:
         _owned_video(db, user_id, video_id)
-        size, checksum = measure_file(path)
-        spec = ArtifactSpec(id=str(uuid4()), user_id=user_id, video_id=video_id, kind=kind, filename=path.name,
-                            bucket=store.bucket, project_fingerprint=store.project_fingerprint, sha256=checksum, size_bytes=size)
-        # Register the immutable key before deletion can remove the video. The
-        # lock ends at the pending commit, BEFORE any remote transfer begins.
+        if user_storage_bytes(db, user_id):
+            raise ApiError(UNAVAILABLE, 503)
+        specs = []
+        size = 0
+        for path in paths:
+            count, checksum = measure_file(path)
+            size += count
+            if size > stage_limit_bytes():
+                raise ApiError(STAGE_LIMIT_MESSAGE, 413)
+            specs.append(ArtifactSpec(id=str(uuid4()), user_id=user_id, video_id=video_id, kind=kind, filename=path.name,
+                                      bucket=store.bucket, project_fingerprint=store.project_fingerprint, sha256=checksum, size_bytes=count))
+        # Register ALL keys before releasing the video lock and starting remote I/O.
         _owned_video(db, user_id, video_id, lock=True)
-        row = StoredArtifact(**{name: getattr(spec, name) for name in SPEC_FIELDS}, state='pending')
-        db.add(row)
-        db.commit()  # Record the immutable key before an upload with unknown outcome.
-        store.put(spec, path)
+        rows = [StoredArtifact(**{name: getattr(spec, name) for name in SPEC_FIELDS}, state='pending') for spec in specs]
+        db.add_all(rows)
+        db.commit()
+        for spec, path in zip(specs, paths, strict=True):
+            store.put(spec, path)
         if db.scalar(select(User.id).where(User.id == user_id).with_for_update()) is None:
             raise ApiError('未找到该视频', 404)
+        if user_storage_bytes(db, user_id):  # Recheck under the user lock against a concurrent local admission.
+            raise ApiError(UNAVAILABLE, 503)
         _owned_video(db, user_id, video_id, lock=True)
-        db.refresh(row, with_for_update=True)
-        if row.delete_requested or row.state != 'pending':
-            raise ApiError('未找到该文件', 404)
-        previous = db.scalar(select(StoredArtifact).where(
+        for row in rows:
+            db.refresh(row, with_for_update=True)
+            if row.delete_requested or row.state != 'pending':
+                raise ApiError('未找到该文件', 404)
+        previous_query = select(StoredArtifact).where(
             StoredArtifact.user_id == user_id, StoredArtifact.video_id == video_id,
-            StoredArtifact.kind == kind, StoredArtifact.filename == path.name, StoredArtifact.state == 'ready',
-        ).with_for_update())
+            StoredArtifact.kind == kind, StoredArtifact.state == 'ready',
+        )
+        if not replace_kind:
+            previous_query = previous_query.where(StoredArtifact.filename.in_([spec.filename for spec in specs]))
+        previous = db.scalars(previous_query.order_by(StoredArtifact.id).with_for_update()).all()
         used = db.scalar(select(func.coalesce(func.sum(StoredArtifact.size_bytes), 0)).where(
             StoredArtifact.user_id == user_id, StoredArtifact.state == 'ready',
         ))
-        replaced = previous.size_bytes if previous else 0
+        replaced = sum(row.size_bytes for row in previous)
         if size > replaced and used - replaced + size > settings.max_user_storage_mb * 1024 * 1024:
             raise ApiError(STORAGE_LIMIT_MESSAGE, 413)
-        if previous:
-            previous.state = 'retired'
-            db.flush()  # Release the partial unique ready slot within this transaction.
-        row.state = 'ready'
+        for row in previous:
+            row.state = 'retired'
+        db.flush()  # Free partial unique slots in the SAME transaction as publishing all new rows.
+        for row in rows:
+            row.state = 'ready'
+        if on_publish is not None:
+            on_publish(specs)  # SQL-only callback; commits with the entire ready group.
         db.commit()
-        return spec
+        return specs
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error('Object ledger publication error type={}', type(exc).__name__)
         raise ApiError(UNAVAILABLE, 503) from None
     except Exception:
         db.rollback()
-        # Retain pending intent and any remote object. Never delete a key whose
-        # publication outcome could be ambiguous after a transport/commit failure.
         raise
 
 
@@ -129,3 +157,27 @@ def purge_retired_artifact(db: Session, *, user_id: str, artifact_id: str, store
         raise ApiError(UNAVAILABLE, 503)
     row.state = 'deleted'
     db.commit()
+
+
+@contextmanager
+def materialize_artifacts(db: Session, *, user_id: str, video_id: str, kind: str, cache_root: Path, store, required_id: str):
+    _owned_video(db, user_id, video_id)
+    rows = db.scalars(select(StoredArtifact).where(
+        StoredArtifact.user_id == user_id, StoredArtifact.video_id == video_id, StoredArtifact.kind == kind,
+        StoredArtifact.state == 'ready', StoredArtifact.delete_requested.is_(False),
+    ).order_by(StoredArtifact.filename)).all()
+    specs = [spec_for(row) for row in rows]
+    if required_id not in {spec.id for spec in specs}:
+        raise ApiError('未找到该文件', 404)
+    if len(specs) > 100 or sum(spec.size_bytes for spec in specs) > stage_limit_bytes():
+        raise ApiError(STAGE_LIMIT_MESSAGE, 413)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix='.object-group-', dir=cache_root) as directory:
+        root = Path(directory)
+        files = {}
+        for spec in specs:
+            path = root / spec.filename
+            store.download(spec, path)
+            files[spec.id] = path
+        _owned_video(db, user_id, video_id)  # Do not release plaintext after a concurrent video deletion.
+        yield root, files[required_id]

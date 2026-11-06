@@ -19,6 +19,7 @@ from app.services.rag import index_video
 from app.services.storage_quota import generate_artifacts
 from app.services.object_storage.cleanup import stage_video_deletion
 from app.services.object_storage.spec import UNAVAILABLE
+from app.services.object_storage.references import require_object_store
 from app.services.vector_store import vector_store
 
 
@@ -163,15 +164,24 @@ def update_video_for_user(db: Session, user: User, video_id: str, payload: Video
     return video
 
 
-def update_note_for_user(db: Session, user: User, video_id: str, payload: VideoNoteUpdate) -> Video:
+def update_note_for_user(db: Session, user: User, video_id: str, payload: VideoNoteUpdate, *, object_store=None) -> Video:
     video = get_video_for_user(db, user, video_id)
     _ensure_editable(video)
+    require_object_store(video, object_store)
     if video.summary is None:
         raise ApiError("请先完成 AI 分析，再编辑笔记", status_code=status.HTTP_409_CONFLICT)
-    generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, payload.markdown_note))
-    video.summary.markdown_note = payload.markdown_note
-    video.summary.note_is_manual = True
-    _commit_and_sync(db, video)
+    def apply_note(_):
+        video.summary.markdown_note = payload.markdown_note
+        video.summary.note_is_manual = True
+        if video.embedding is not None:
+            video.index_sync_error = "知识库内容待同步"
+    generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, payload.markdown_note),
+                       object_store=object_store, object_on_publish=apply_note)
+    if object_store is None:
+        apply_note(None)
+        _commit_and_sync(db, video)
+    elif video.embedding is not None:
+        _sync_index(db, video)
     return video
 
 

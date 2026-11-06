@@ -5,12 +5,14 @@ from app.agents.video_analysis_agent import analyze_video_transcript
 from app.services.storage_quota import artifact_directory, generate_artifacts
 from app.services.temporary_storage import ensure_free_space, write_bounded_text
 from app.core.errors import ApiError
+from app.services.object_storage.references import require_object_store
 from app.core.i18n import t
 from app.models.summary import Summary
 from app.models.video import Video
 
 
-def analyze_video(db: Session, video: Video) -> Summary:
+def analyze_video(db: Session, video: Video, *, object_store=None) -> Summary:
+    require_object_store(video, object_store)
     if video.transcript is None or not video.transcript.content.strip():
         raise ApiError(t("transcript_required"), status_code=status.HTTP_400_BAD_REQUEST)
 
@@ -25,8 +27,18 @@ def analyze_video(db: Session, video: Video) -> Summary:
         video_title=video.title,
     )
     if video.summary is None or not video.summary.note_is_manual:
-        generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, markdown_note))
+        generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, markdown_note),
+                           object_store=object_store, object_on_publish=lambda _: _apply_analysis(db, video, analysis, markdown_note))
+        if object_store is not None:
+            db.refresh(video.summary)
+            return video.summary
+    summary = _apply_analysis(db, video, analysis, markdown_note)
+    db.commit()
+    db.refresh(summary)
+    return summary
 
+
+def _apply_analysis(db, video, analysis, markdown_note):
     summary = video.summary
     if summary is None:
         summary = Summary(video_id=video.id, summary=analysis.summary)
@@ -47,8 +59,6 @@ def analyze_video(db: Session, video: Video) -> Summary:
         summary.markdown_note = markdown_note
 
     db.add(summary)
-    db.commit()
-    db.refresh(summary)
     return summary
 
 

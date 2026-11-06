@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 
-from app.core.config import settings
 from app.services.storage_quota import artifact_directory
 from app.services.temporary_storage import write_bounded_text
 from app.services.video_processing.types import SubtitleResult
@@ -24,7 +23,7 @@ def _subtitle_priority(path: Path, video_id: str) -> tuple[int, bool, str]:
 
 
 def find_downloaded_subtitles(video_id: str) -> SubtitleResult | None:
-    video_dir = Path(settings.video_storage_dir)
+    video_dir = artifact_directory('video')
     if not video_dir.exists():
         return None
 

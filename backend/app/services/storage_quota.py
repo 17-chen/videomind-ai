@@ -15,7 +15,7 @@ from tempfile import TemporaryDirectory
 from typing import TypeVar
 
 from fastapi import status
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -33,6 +33,16 @@ STORAGE_LIMIT_MESSAGE = "已达到个人文件存储总量上限，请先删除�
 
 def artifact_directory(kind: str) -> Path:
     return _staging.get().get(kind, Path(getattr(settings, f"{kind}_storage_dir")))
+
+
+@contextmanager
+def artifact_input_directory(kind: str, path: Path):
+    """Use a private hydrated input group without changing global settings."""
+    token = _staging.set({**_staging.get(), kind: path})
+    try:
+        yield path
+    finally:
+        _staging.reset(token)
 
 
 def user_storage_bytes(db: Session, user_id: str) -> int:
@@ -63,6 +73,17 @@ def check_storage_quota(
     """Hold the user's row lock until the caller publishes and commits/rolls back."""
     with db.no_autoflush:
         db.execute(select(User.id).where(User.id == user_id).with_for_update()).scalar_one()
+        # Until migration and upload quotas share one backend, never admit a
+        # local write while this user has remote objects or uncertain intents.
+        from app.services.object_storage.models import StoredArtifact
+        connection = db.connection()
+        schema = 'public' if connection.dialect.name == 'postgresql' else None
+        if inspect(connection).has_table(StoredArtifact.__tablename__, schema=schema):
+            remote = db.scalar(select(StoredArtifact.id).where(
+                StoredArtifact.user_id == user_id, StoredArtifact.state != 'deleted',
+            ).limit(1))
+            if remote is not None:
+                raise ApiError('文件存储暂不可用，请稍后重试', 503)
         used = user_storage_bytes(db, user_id)
     replaced_bytes = 0
     for path in set(replacing):
@@ -92,7 +113,7 @@ def staging_directory(kind: str) -> Iterator[Path]:
             _staging.reset(token)
 
 
-def generate_artifacts(db: Session, video: Video, kind: str, producer: Callable[[], T]) -> T:
+def generate_artifacts(db: Session, video: Video, kind: str, producer: Callable[[], T], *, object_store=None, object_on_publish=None) -> T:
     """Generate in staging, admit all outputs together, publish, then release the lock.
 
     Callers must invoke this before mutating models for the generated result. No
@@ -103,11 +124,33 @@ def generate_artifacts(db: Session, video: Video, kind: str, producer: Callable[
         check_stage_space(staged)
         files = list(staged.iterdir())
         if not files:
+            if object_store is not None and (result is not None or kind != 'transcript'):
+                raise ApiError('生成文件路径异常，请联系管理员', 409)
             return result
         root = Path(getattr(settings, f"{kind}_storage_dir"))
         for path in files:
             if not path.name.startswith(f"{video.id}.") or not path.is_file() or path.is_symlink():
                 raise ApiError("生成文件路径异常，请联系管理员", status.HTTP_409_CONFLICT)
+        if object_store is not None:
+            # Local import avoids a cycle: the repository reuses the quota message.
+            from app.services.object_storage.repository import publish_artifacts
+            from app.services.object_storage.references import artifact_reference
+            result_path = getattr(result, 'file_path', None)
+            staged_result = result_path and is_dataclass(result) and Path(result_path).parent == staged
+            if (result_path and kind in ('video', 'audio') and not staged_result) or (staged_result and Path(result_path).name not in {path.name for path in files}):
+                raise ApiError('生成文件路径异常，请联系管理员', 409)
+            converted = result
+            def admit(specs):
+                nonlocal converted
+                if staged_result:
+                    spec = next(spec for spec in specs if spec.filename == Path(result_path).name)
+                    converted = replace(result, file_path=artifact_reference(spec.id))
+                if object_on_publish is not None:
+                    object_on_publish(converted)
+            publish_artifacts(db, user_id=video.user_id, video_id=video.id, kind=kind,
+                              paths=files, store=object_store, replace_kind=True, on_publish=admit)
+            return converted
+
         destinations = tuple(root / path.name for path in files)
         try:
             check_storage_quota(db, video.user_id, sum(path.stat().st_size for path in files), replacing=destinations)
