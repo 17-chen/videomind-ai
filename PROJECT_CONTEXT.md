@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-11-06 补充：**R6 处理/分析/笔记编辑服务可显式注入对象客户端，已支持成组发布、按用户私有落地、对象 ID 引用及正文/引用与账本同事务提交；禁止本地/对象混用以防配额漏算。293 项后端测试/Ruff、前端隔离检查通过，含真实 PostgreSQL 并发/回滚和真实 ffmpeg；Supabase、ASR 与 LLM 响应为模拟。上传 API、持久 Worker 后端选择、迁移与真实云端验收仍待做，默认运行未切换。见 [说明](docs/OBJECT_STORAGE.md) 和 [核查](docs/VERIFICATION_2026-11-06.md)。
+**2026-11-06 补充：**功能提交 `df1f8b2` 已同步 GitHub，[CI 42197987551](https://github.com/17-chen/videomind-ai/actions/runs/42197987551) 后端与前端均通过。R6 处理/分析/笔记编辑服务可显式注入对象客户端，已支持成组发布、按用户私有落地、对象 ID 引用及正文/引用与账本同事务提交；禁止本地/对象混用以防配额漏算。293 项后端测试/Ruff、前端隔离检查通过，含真实 PostgreSQL 并发/回滚和真实 ffmpeg；Supabase、ASR 与 LLM 响应为模拟。上传 API、持久 Worker 后端选择、迁移与真实云端验收仍待做，默认运行未切换。见 [说明](docs/OBJECT_STORAGE.md) 和 [核查](docs/VERIFICATION_2026-11-06.md)。
 
 **2026-11-05 补充：**功能提交 `b8134aa` 已同步 GitHub，[CI 42004927480](https://github.com/17-chen/videomind-ai/actions/runs/42004927480) 后端与前端均通过。R6/R8 接通视频删除与对象清理意图：删除意图和业务记录同事务提交，显式维护命令默认只读，已确认对象可按精确键重试；pending 上传结果不明时保留。267 项后端测试/Ruff 通过，含真实 PostgreSQL 删除/上传与维护并发、SQL 故障回滚；身份、向量和 Supabase 响应仍为模拟。上传/Worker/编辑读取尚未接入，不代表完整云端存储或真实验收。见 [说明](docs/OBJECT_STORAGE.md) 和 [核查](docs/VERIFICATION_2026-11-05.md)。
 

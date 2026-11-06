@@ -19,7 +19,7 @@
 - **前端**：源码未改；一次性禁网容器、依赖卷只读挂载，Next.js 16.4.3 build/typecheck/lint 与 4 项部署保护用例通过，未覆盖开发 `.next` 或修改依赖卷。
 - **隔离检索**：实际 Chroma/local_hash，15 道固定虚构语料题，Recall@3 96.43%、Hit@3 100%、MRR@3 1.0、隔离违规 0；不是模型语义质量或生成回答验收。既有 Chroma telemetry/ONNX 主机提示保留，命令成功退出。
 
-运行核对：当前业务库 head 仍 `20261024_0008`、对象账本不存在、向量仍为 chroma；readiness HTTP 200 且 database/vector_store 均 ok。未切换配置、迁移业务库或改变既有卷。本轮 tmpfs PostgreSQL 容器已停止删除，前端检查容器自动退出删除；既有容器/卷/镜像均保留。GitHub CI 结果待推送后补记。
+运行核对：当前业务库 head 仍 `20261024_0008`、对象账本不存在、向量仍为 chroma；readiness HTTP 200 且 database/vector_store 均 ok。未切换配置、迁移业务库或改变既有卷。本轮 tmpfs PostgreSQL 容器已停止删除，前端检查容器自动退出删除；既有容器/卷/镜像均保留。功能提交 `df1f8b2` 已同步 GitHub，[CI 42197987551](https://github.com/17-chen/videomind-ai/actions/runs/42197987551) 后端与前端均通过（全量回归/真实 SQL、Ruff、隔离检索、前端构建/类型/Lint/部署保护）。后续仅补验证记录。
 
 ## 未验收与下一步
 
