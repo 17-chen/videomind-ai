@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -100,9 +100,8 @@ def publish_artifacts(db: Session, *, user_id: str, video_id: str, kind: str, pa
         if not replace_kind:
             previous_query = previous_query.where(StoredArtifact.filename.in_([spec.filename for spec in specs]))
         previous = db.scalars(previous_query.order_by(StoredArtifact.id).with_for_update()).all()
-        used = db.scalar(select(func.coalesce(func.sum(StoredArtifact.size_bytes), 0)).where(
-            StoredArtifact.user_id == user_id, StoredArtifact.state == 'ready',
-        ))
+        from app.services.object_storage.quotas import logical_bytes
+        used = logical_bytes(db, user_id)
         replaced = sum(row.size_bytes for row in previous)
         if size > replaced and used - replaced + size > settings.max_user_storage_mb * 1024 * 1024:
             raise ApiError(STORAGE_LIMIT_MESSAGE, 413)

@@ -53,6 +53,9 @@ class SupabaseObjectStore:
         from app.core.config import settings
         return cls(settings.supabase_url, settings.supabase_storage_service_key, settings.supabase_storage_bucket)
 
+    def check_connection(self):
+        self._private_bucket()
+
     def close(self):
         self._client.close()
 

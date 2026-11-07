@@ -91,6 +91,15 @@ def check_configuration(config: 'Settings', frontend: Mapping[str, str]) -> dict
     checks: dict[str, bool] = {}
     checks['production_mode'] = config.is_production
     checks['supported_vector_backend'] = config.vector_store_backend in ('chroma', 'pgvector')
+    checks['supported_file_backend'] = config.file_storage_backend.lower() in ('local', 'supabase')
+    if config.file_storage_backend.lower() == 'supabase':
+        from app.services.object_storage.supabase import SupabaseObjectStore
+        try:
+            store = SupabaseObjectStore(config.supabase_url, config.supabase_storage_service_key, config.supabase_storage_bucket)
+            store.close()  # Shape validation only; no network request.
+            checks['storage_server_configuration'] = True
+        except Exception:
+            checks['storage_server_configuration'] = False
     checks['supabase_auth_mode'] = config.auth_mode.lower() == 'supabase'
     supabase = public_origin(config.supabase_url)
     checks['backend_supabase_https_origin'] = supabase is not None

@@ -30,7 +30,9 @@ def process_video_by_id(video_id: str) -> None:
             logger.warning("Skipping processing for missing video {}", video_id)
             return
 
-        process_video(db=db, video=video)
+        from app.services.file_storage import managed_file_store
+        with managed_file_store(db) as store:
+            process_video(db=db, video=video, object_store=store)
     except Exception as exc:
         logger.error("Background video processing stopped for {}: {}", video_id, type(exc).__name__)
     finally:

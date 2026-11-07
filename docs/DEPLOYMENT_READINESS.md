@@ -1,6 +1,6 @@
 # 部署时机与预发布步骤
 
-核对日期：2026-11-06。当前是本地功能演示与生产准备阶段。2026-11-03 新增可选 [pgvector 共享向量适配](PGVECTOR.md)，本地真实 SQL 已验证，目标云服务未接入；2026-11-04 新增[对象传输/账本基础](OBJECT_STORAGE.md)，2026-11-05 视频删除意图已接入，2026-11-06 处理/分析/笔记服务已有显式对象路径，但上传 API、持久 Worker 后端选择与迁移未完成，不能据此切换部署拓扑。上传、编辑、队列、本人配置调用路径及配额有代码和测试证据；真实双用户、本人模型闭环及云端持久存储未验收。后端测试数量不是产品完成百分比。
+核对日期：2026-11-07。当前是本地功能演示与生产准备阶段。2026-11-03 新增可选 [pgvector 共享向量适配](PGVECTOR.md)，本地真实 SQL 已验证，目标云服务未接入；2026-11-04 新增[对象传输/账本基础](OBJECT_STORAGE.md)，2026-11-05 视频删除意图已接入，2026-11-06 处理/分析/笔记服务已有显式对象路径，2026-11-07 上传 API、来源预留与持久 Worker/HTTP 后端选择已接入，默认仍本地；旧文件迁移和目标云端验收未完成，不能直接切换现有用户。上传、编辑、队列、本人配置调用路径及配额有代码和测试证据；真实双用户、本人模型闭环及云端持久存储未验收。后端测试数量不是产品完成百分比。
 
 ## 什么时候部署
 
@@ -17,13 +17,15 @@
 
 ## 先解决 API 与 Worker 的存储拓扑
 
-当前 API 接收上传、编辑/删除文件并访问 Chroma；Worker 读取媒体并生成音频/转写/笔记、写入向量。两者依赖相同的本地路径和数据，单独运行 API 不会消费持久任务。
+当前 API 接收上传、编辑/删除文件并访问 Chroma；Worker 读取媒体并生成音频/转写/笔记、写入向量。默认 local/Chroma 模式仍依赖相同本地路径；可选 supabase/pgvector 模式共享云对象与 SQL，须在目标环境验证。单独运行 API 不会消费持久任务。
 
 **不能直接把当前 API 和 Worker 分别部署成两个 Render 服务，再给它们各挂一块盘。** 两块同名路径的盘不是同一份文件。Render 持久盘只能由单个服务实例访问，其他服务无法共享；无持久盘的文件会在重部署时丢失。[Render 官方磁盘说明](https://render.com/docs/disks)。
 
-原定 Vercel + Render + Supabase 路线保留，但 Render 的最终服务配置必须等存储适配后确定：媒体、音频、转写和笔记需要共享对象存储，向量需通过 pgvector/可访问的独立向量服务共享。现有生产 Chroma 本地双进程模式也不能假定支持多服务并发。
+原定 Vercel + Render + Supabase 路线保留，当前可选适配可用于空白受控预发布联调，最终服务配置仍须结合目标资源、临时空间与持久性验证确定：媒体、音频、转写和笔记需要共享对象存储，向量需通过 pgvector/可访问的独立向量服务共享。现有生产 Chroma 本地双进程模式也不能假定支持多服务并发。
 
 另一种受限预览可以将现有 Compose 布置在一台受控主机，保留共享业务目录；这仍需入口 HTTPS、访问保护、备份、资源限制和该主机实测，不是本轮已交付的 Render 部署方案。本轮没有擅自切换平台或创建服务，因此不提供会掩盖上述问题的可直接启动 Render 双服务蓝图。
+
+云模式联调先备份并显式升级业务、pgvector 和对象迁移（对象 head `20261107_o003`），核对后端 SQL 角色权限和私有 bucket，再为 API/Worker 同时配置 `FILE_STORAGE_BACKEND=supabase`、`VECTOR_STORE_BACKEND=pgvector` 及相同数据库/项目。服务端 Storage Key 只进后端私有设置。已有本地用户须先迁移并对账；本轮没有执行这些环境切换，详见 [对象说明](OBJECT_STORAGE.md)。
 
 ## 前端 Vercel 配置
 
@@ -57,7 +59,7 @@ python -m scripts.check_deployment --frontend-env-file /secure/frontend.env
 
 该文件只用于比对拟部署的前端变量，环境中已有值优先；本地 Compose 已导出的 localhost 配置会优先于文件，因此本机开发环境被阻止是预期结果。不要为使预检变绿而改写正在使用的本地 `.env`。CLI 不输出变量值、URL、密码、Key 或校验异常正文，不访问网络/数据库，不迁移/写文件。`configuration_passed` 只是配置形式通过；输出始终保留 `ready_for_public_users=false` 和待做真实验收清单。格式错误/无法读取返回 2，不能以退出 0 替代验收。
 
-最终 API 启动沿用生产镜像：迁移后启动 Uvicorn，禁用原始访问日志和代理头信任。Worker 为 `python -m scripts.video_worker`，独立消费同库任务；Linux 音频监督和 init 回收条件见 [临时空间说明](TEMPORARY_STORAGE.md)。不要在迁移不兼容的情况下让多个实例同时无序迁移。`/health` 是进程存活；`/api/v1/health/ready` 核对数据库连接和向量库可用性。就绪成功仍不证明 Worker、文件共享或第三方服务可用。
+最终 API 启动沿用生产镜像：迁移后启动 Uvicorn，禁用原始访问日志和代理头信任。Worker 为 `python -m scripts.video_worker`，独立消费同库任务；Linux 音频监督和 init 回收条件见 [临时空间说明](TEMPORARY_STORAGE.md)。不要在迁移不兼容的情况下让多个实例同时无序迁移。`/health` 是进程存活；`/api/v1/health/ready` 核对数据库、向量库与所选文件后端；supabase 文件模式检查账本列及私有桶元数据。就绪成功仍不证明 Worker、完整文件权限、持久性或模型服务可用。
 
 Supabase 的 Site URL、允许重定向 URL 和实际预发布地址保持一致；需按当前密码登录/注册/邮箱验证流程测试。只添加受控预发布域名，不因调试把所有任意域名开放为可信回调。[Supabase 重定向说明](https://supabase.com/docs/guides/auth/redirect-urls)。
 

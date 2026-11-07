@@ -41,3 +41,9 @@ def get_current_user(
         display_name=identity.display_name,
         avatar_url=identity.avatar_url,
     )
+
+
+def get_file_storage(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.services.file_storage import managed_file_store
+    with managed_file_store(db) as store:
+        yield store

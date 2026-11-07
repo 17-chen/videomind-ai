@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, get_db
+from app.api.dependencies import get_current_user, get_db, get_file_storage
 from app.core.config import settings
 from app.core.i18n import t
 from app.core.errors import ApiError
@@ -54,8 +54,9 @@ def upload_video(
     title: str | None = Form(default=None, max_length=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    object_store=Depends(get_file_storage),
 ) -> VideoRead:
-    video = save_uploaded_video(db=db, user=current_user, file=file, title=title)
+    video = save_uploaded_video(db=db, user=current_user, file=file, title=title, object_store=object_store)
     return VideoRead.model_validate(video)
 
 
@@ -128,8 +129,9 @@ def edit_video_note(
     payload: VideoNoteUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    object_store=Depends(get_file_storage),
 ) -> VideoRead:
-    return VideoRead.model_validate(update_note_for_user(db, current_user, video_id, payload))
+    return VideoRead.model_validate(update_note_for_user(db, current_user, video_id, payload, object_store=object_store))
 
 
 @router.post("/{video_id}/sync-index", response_model=VideoRead, summary="重试知识库同步")

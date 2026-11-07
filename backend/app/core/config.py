@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     auth_mode: str = "demo"
     supabase_url: str = ""
     supabase_anon_key: str = ""
+    file_storage_backend: str = "local"
     supabase_storage_service_key: str = ""
     supabase_storage_bucket: str = "videomind-private"
 

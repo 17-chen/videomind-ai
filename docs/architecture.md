@@ -1,5 +1,7 @@
 # VideoMind AI 当前技术架构
 
+> 2026-11-07：上传 API、笔记编辑和持久 Worker 共用 `managed_file_store`，可选 Supabase 前先检查账本/私有桶；源上传预留后再传输，Video 与 ready 原子发布。默认 local，既有环境未迁移；[说明与边界](OBJECT_STORAGE.md)。
+
 > 2026-11-06：[对象成组发布/私有落地](OBJECT_STORAGE.md) 已接入处理、分析和笔记编辑服务的显式客户端参数；正文/引用与账本同事务。默认 HTTP/持久 Worker 仍为本地，上传与统一后端工厂待做。
 
 > 2026-11-05：视频删除已接入[对象清理意图与显式维护](OBJECT_STORAGE.md)，与业务删除同事务；pending 不自动回收。上传/处理/读取仍用本地目录。

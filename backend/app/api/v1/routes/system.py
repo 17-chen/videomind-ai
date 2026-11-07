@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
-from app.database.session import check_database_connection
+from app.database.session import check_database_connection, SessionLocal
+from app.services.file_storage import managed_file_store
 from app.services.vector_store import vector_store
 
 router = APIRouter()
@@ -37,4 +38,9 @@ def readiness_check() -> dict[str, str]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="向量知识库尚未就绪",
         ) from exc
-    return {"status": "ready", "service": settings.app_name, "database": "ok", "vector_store": "ok"}
+    try:
+        with SessionLocal() as db, managed_file_store(db):
+            pass
+    except Exception:
+        raise HTTPException(status_code=503, detail='文件存储尚未就绪') from None
+    return {"status": "ready", "service": settings.app_name, "database": "ok", "vector_store": "ok", "file_storage": settings.file_storage_backend.lower()}

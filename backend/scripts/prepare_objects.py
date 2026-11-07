@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         print(json.dumps({"status": "failed", "reason": "objects_migration_failed"}))
         return 1
-    print(json.dumps({"status": "applied", "revision": "20261105_o002"}))
+    print(json.dumps({"status": "applied", "revision": "20261107_o003"}))
     return 0
 
 

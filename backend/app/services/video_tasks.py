@@ -1,6 +1,7 @@
 """PostgreSQL-backed video work queue and cooperative cancellation."""
 
 from datetime import UTC, datetime, timedelta
+from contextlib import ExitStack
 from uuid import uuid4
 
 from fastapi import status
@@ -16,6 +17,7 @@ from app.models.user import User
 from app.models.video import Video, VideoStatus
 from app.models.video_task import VideoTask
 from app.services.analysis import analyze_video
+from app.services.file_storage import managed_file_store
 from app.services.rag import index_video
 from app.services.request_limits import lock_user_for_limits
 from app.services.video_processing.pipeline import process_video
@@ -174,15 +176,18 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
     if task is None or task.status != "running" or task.worker_id != worker_id:
         return
     video = task.video
+    resources = ExitStack()
     try:
         if _stop_at_checkpoint(db, task, worker_id):
             return
+        store = resources.enter_context(managed_file_store(db))
+        storage_options = {'object_store': store} if store is not None else {}
         needs_transcript = video.transcript is None or not video.transcript.content.strip()
         if task.kind in ("process", "run") and (needs_transcript or (task.kind == "process" and task.attempts == 1)):
             if not _set_stage(db, task, worker_id, "transcription"):
                 return
             update_video_status(db, video, VideoStatus.TRANSCRIBING if video.source == "upload" else VideoStatus.DOWNLOADING)
-            process_video(db, video, final_status=VideoStatus.ANALYZING if task.kind == "run" else VideoStatus.COMPLETED)
+            process_video(db, video, final_status=VideoStatus.ANALYZING if task.kind == "run" else VideoStatus.COMPLETED, **storage_options)
         if _stop_at_checkpoint(db, task, worker_id):
             return
         if task.kind in ("run", "analyze"):
@@ -190,7 +195,7 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
                 if not _set_stage(db, task, worker_id, "analysis"):
                     return
                 update_video_status(db, video, VideoStatus.ANALYZING)
-                analyze_video(db, video)
+                analyze_video(db, video, **storage_options)
             if _stop_at_checkpoint(db, task, worker_id):
                 return
         if task.kind in ("run", "embed"):
@@ -237,6 +242,8 @@ def execute_claimed_task(db: Session, task_id: str, worker_id: str) -> None:
         db.commit()
         _log_task_event(task, "failed")
 
+    finally:
+        resources.close()
 
 def _set_stage(db: Session, task: VideoTask, worker_id: str, stage: str) -> bool:
     result = db.execute(

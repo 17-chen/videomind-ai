@@ -74,7 +74,7 @@ def test_migration_idempotent_and_backend_only(object_db):
         optional.attributes['connection'] = connection
         command.upgrade(optional, 'head')
         assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '20261024_0008'
-        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261105_o002'
+        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261107_o003'
         assert connection.scalar(text("SELECT relrowsecurity FROM pg_class WHERE oid='public.vm_storage_objects'::regclass")) is True
         for role in ('anon', 'authenticated', 'service_role'):
             for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
@@ -369,7 +369,7 @@ def test_migration_preserves_existing_row_and_blocks_losing_pending_deletion(obj
             optional.attributes['connection'] = connection
             command.downgrade(optional, '20261104_o001')
     with engine.connect() as connection:
-        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261105_o002'
+        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261107_o003'
         assert connection.scalar(text('SELECT delete_requested FROM vm_storage_objects')) is True
 
 
@@ -468,3 +468,125 @@ def test_note_sql_failure_keeps_old_note_and_ready_export(object_db, tmp_path):
         assert video.summary.markdown_note == 'previous note'
         assert db.scalar(select(StoredArtifact).where(StoredArtifact.state == 'ready')).id == previous
         assert len(db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'pending')).all()) == 1
+
+
+@pytest.mark.parametrize('duplicate', [False, True])
+def test_source_reservation_serializes_quota_and_dedup_before_network(object_db, monkeypatch, duplicate):
+    from io import BytesIO
+    from threading import Event
+    from fastapi import UploadFile
+    from app.services import video_upload
+    engine, owner, _ = object_db
+    monkeypatch.setattr(video_upload, '_probe_video', lambda path: 1)
+    monkeypatch.setattr(settings, 'max_user_upload_mb', 1)
+    monkeypatch.setattr(settings, 'max_user_storage_mb', 4)
+    entered, release = Event(), Event()
+    class Held(DeletionTestStore):
+        def put(self, spec, path):
+            with Session(engine) as observer:
+                row = observer.get(StoredArtifact, spec.id)
+                assert row.state == 'pending' and row.is_source_upload
+                assert observer.get(Video, spec.video_id) is None
+            entered.set()
+            assert release.wait(timeout=10)
+            super().put(spec, path)
+    store = Held()
+    def upload(data):
+        with Session(engine) as db:
+            try:
+                item = video_upload.save_uploaded_video(db, db.get(User, owner), UploadFile(BytesIO(data), filename='source.mp4'), object_store=store)
+                return 201, item.id
+            except ApiError as error:
+                return error.status_code, error.message
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(upload, b'a' * 700000)
+        try:
+            assert entered.wait(timeout=5)
+            second = pool.submit(upload, b'a' * 700000 if duplicate else b'b' * 400000)
+            status, message = second.result(timeout=5)
+            assert status == (409 if duplicate else 413)
+            assert ('等待核对' if duplicate else '上传视频存储上限') in message
+        finally:
+            release.set()
+        assert first.result(timeout=5)[0] == 201
+    with Session(engine) as db:
+        rows = db.scalars(select(StoredArtifact)).all()
+        assert len(rows) == 1 and rows[0].state == 'ready' and rows[0].is_source_upload
+        assert db.query(Video).filter(Video.source == 'upload').count() == 1
+
+
+def test_source_sql_failure_keeps_reservation_and_does_not_publish_video(object_db, monkeypatch):
+    from io import BytesIO
+    from fastapi import UploadFile
+    from app.services import video_upload
+    from app.services.object_storage.quotas import logical_bytes
+    engine, owner, _ = object_db
+    monkeypatch.setattr(video_upload, '_probe_video', lambda path: 1)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE FUNCTION synthetic_reject_upload() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.source = 'upload' THEN RAISE EXCEPTION 'private-database-sentinel'; END IF; RETURN NEW; END $$"))
+        connection.execute(text('CREATE TRIGGER synthetic_reject_upload BEFORE INSERT ON videos FOR EACH ROW EXECUTE FUNCTION synthetic_reject_upload()'))
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        with pytest.raises(ApiError) as error:
+            video_upload.save_uploaded_video(db, db.get(User, owner), UploadFile(BytesIO(b'synthetic'), filename='source.mp4'), object_store=store)
+        assert error.value.status_code == 503 and 'private-database-sentinel' not in error.value.message
+        row = db.scalar(select(StoredArtifact))
+        assert row.state == 'pending' and row.is_source_upload and row.size_bytes == 9
+        assert db.get(Video, row.video_id) is None and logical_bytes(db, owner) == 9
+    assert len(store.keys) == 1
+
+
+def test_source_accounting_cannot_be_downgraded_while_live(object_db, monkeypatch):
+    from io import BytesIO
+    from fastapi import UploadFile
+    from app.services import video_upload
+    engine, owner, _ = object_db
+    monkeypatch.setattr(video_upload, '_probe_video', lambda path: 1)
+    with Session(engine) as db:
+        video_upload.save_uploaded_video(db, db.get(User, owner), UploadFile(BytesIO(b'synthetic'), filename='source.mp4'), object_store=DeletionTestStore())
+    with pytest.raises(RuntimeError, match='Upload reservations'):
+        with engine.begin() as connection:
+            optional = migration_config()
+            optional.attributes['connection'] = connection
+            command.downgrade(optional, '20261105_o002')
+    with engine.connect() as connection:
+        assert connection.scalar(text('SELECT version_num FROM alembic_version_objects')) == '20261107_o003'
+        assert connection.scalar(text('SELECT is_source_upload FROM vm_storage_objects')) is True
+
+
+def test_source_migration_backfills_exact_owned_reference_only(object_db, tmp_path):
+    from app.services.object_storage.references import artifact_reference
+    from app.services.object_storage.repository import publish_artifacts
+    engine, owner, ids = object_db
+    root = tmp_path / 'input'
+    root.mkdir()
+    paths = [root / f'{ids[0]}{suffix}' for suffix in ('.mp4', '.en.vtt')]
+    for path in paths:
+        path.write_bytes(b'synthetic')
+    with Session(engine) as db:
+        specs = publish_artifacts(db, user_id=owner, video_id=ids[0], kind='video', paths=paths, store=DeletionTestStore())
+        video = db.get(Video, ids[0])
+        video.source, video.media_path = 'upload', artifact_reference(specs[0].id)
+        db.commit()
+    with engine.begin() as connection:
+        optional = migration_config()
+        optional.attributes['connection'] = connection
+        command.downgrade(optional, '20261105_o002')
+        command.upgrade(optional, 'head')
+    with Session(engine) as db:
+        assert db.get(StoredArtifact, specs[0].id).is_source_upload is True
+        assert db.get(StoredArtifact, specs[1].id).is_source_upload is False
+
+
+def test_pending_source_unique_constraint_cannot_be_bypassed(object_db):
+    from sqlalchemy.exc import IntegrityError
+    engine, owner, ids = object_db
+    with engine.begin() as connection:
+        sql = text("""INSERT INTO vm_storage_objects
+            (id,user_id,video_id,kind,filename,bucket,project_fingerprint,sha256,size_bytes,state,is_source_upload)
+            VALUES (:id,:owner,:video,'video',:filename,'videomind-private',:fingerprint,:sha,9,'pending',true)""")
+        values = dict(owner=owner, video=ids[0], filename=f'{ids[0]}.mp4', fingerprint='a' * 64, sha='b' * 64)
+        connection.execute(sql, values | {'id': str(uuid4())})
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(sql, values | {'id': str(uuid4())})

@@ -20,6 +20,8 @@ class StoredArtifact(IdMixin, TimestampMixin, ArtifactBase):
         Index('uq_storage_ready', 'user_id', 'video_id', 'kind', 'filename', unique=True,
               postgresql_where=text("state='ready'"), sqlite_where=text("state='ready'")),
         Index('ix_storage_cleanup', 'state', 'id', postgresql_where=text('delete_requested'), sqlite_where=text('delete_requested')),
+        Index('uq_storage_pending_upload', 'user_id', 'sha256', unique=True,
+              postgresql_where=text("is_source_upload AND state='pending'"), sqlite_where=text("is_source_upload AND state='pending'")),
     )
     # No cascading FK: deleting a video must not erase the remote cleanup record.
     # Repository methods independently verify current Video ownership before I/O.
@@ -33,3 +35,4 @@ class StoredArtifact(IdMixin, TimestampMixin, ArtifactBase):
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     state: Mapped[str] = mapped_column(String(16), nullable=False, default='pending')
     delete_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text('false'))
+    is_source_upload: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text('false'))

@@ -1,6 +1,6 @@
 # 项目上下文
 
-> 最后核对：2026-11-06。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-07。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
@@ -34,6 +34,8 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 详见 [当前架构](docs/architecture.md)。
 
 ## 验证状态
+
+**2026-11-07 补充：**R6 上传 API、笔记编辑与持久 Worker 已统一接入可选文件后端；上传先持久预留来源/总量配额，确认后才原子发布 Video。新增可选迁移 `20261107_o003`，默认 `FILE_STORAGE_BACKEND=local`，未切换现有环境。316 项后端测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过；真实 PostgreSQL/ffmpeg，身份、Supabase、ASR、LLM 和向量写入使用测试替身。旧文件迁移、pending 结果对账、真实双用户与云端持久性仍未验收。见 [核查](docs/VERIFICATION_2026-11-07.md)。
 
 **2026-11-06 补充：**功能提交 `df1f8b2` 已同步 GitHub，[CI 42197987551](https://github.com/17-chen/videomind-ai/actions/runs/42197987551) 后端与前端均通过。R6 处理/分析/笔记编辑服务可显式注入对象客户端，已支持成组发布、按用户私有落地、对象 ID 引用及正文/引用与账本同事务提交；禁止本地/对象混用以防配额漏算。293 项后端测试/Ruff、前端隔离检查通过，含真实 PostgreSQL 并发/回滚和真实 ffmpeg；Supabase、ASR 与 LLM 响应为模拟。上传 API、持久 Worker 后端选择、迁移与真实云端验收仍待做，默认运行未切换。见 [说明](docs/OBJECT_STORAGE.md) 和 [核查](docs/VERIFICATION_2026-11-06.md)。
 

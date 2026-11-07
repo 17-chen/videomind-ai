@@ -1,6 +1,8 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "相同视频正在上传或等待核对，请稍后重试": ["相同视频正在上传或等待核对，请稍后重试", "This video is uploading or awaiting verification. Please try again later."],
+  "文件存储尚未就绪": ["文件存储尚未就绪", "File storage is not ready yet."],
   "文件存储暂不可用，请稍后重试": ["文件存储暂不可用，请稍后重试", "File storage is temporarily unavailable. Please try again later."],
   "文件完整性校验失败，请稍后重试": ["文件完整性校验失败，请稍后重试", "File integrity verification failed. Please try again later."],
   "知识库暂不可用，请稍后重试": ["知识库暂不可用，请稍后重试", "The knowledge library is temporarily unavailable. Please try again later."],

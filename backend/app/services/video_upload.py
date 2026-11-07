@@ -18,7 +18,7 @@ from app.core.config import settings
 from app.core.errors import ApiError
 from app.models.user import User
 from app.models.video import Video, VideoStatus
-from app.services.storage_quota import check_storage_quota
+from app.services.storage_quota import check_storage_quota, staging_directory
 from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, ensure_free_space, stage_limit_bytes
 
 
@@ -52,7 +52,7 @@ def _check_user_upload_quota(db: Session, user: User, incoming_bytes: int) -> No
         raise ApiError("已达到个人上传视频存储上限，请先删除不需要的视频", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
 
-def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | None = None) -> Video:
+def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | None = None, *, object_store=None) -> Video:
     filename = file.filename or ""
     extension = Path(filename).suffix.lower()
     if extension not in UPLOAD_EXTENSIONS:
@@ -60,31 +60,28 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
     if file.content_type and not (file.content_type.startswith("video/") or file.content_type == "application/octet-stream"):
         raise ApiError("请选择视频文件", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
+    if object_store is not None:
+        if db.new or db.dirty or db.deleted:
+            raise ValueError('Object upload requires a clean dedicated database session')
+        from app.services.object_storage.upload import publish_uploaded_video
+        video_id = str(uuid4())
+        with staging_directory('video') as staged:
+            path = staged / f'{video_id}{extension}'
+            count, checksum = _write_upload(file, path)
+            duration = _probe_video(path)
+            return publish_uploaded_video(db, user_id=user.id, video_id=video_id, path=path, size=count,
+                                          checksum=checksum, duration=duration,
+                                          title=title.strip() if title and title.strip() else '本地上传的视频', store=object_store)
+
     video_id = str(uuid4())
     storage_dir = Path(settings.video_storage_dir)
     storage_dir.mkdir(parents=True, exist_ok=True)
     partial_path = storage_dir / f"{video_id}.part"
     final_path = storage_dir / f"{video_id}{extension}"
-    byte_count = 0
-    digest = hashlib.sha256()
-    max_bytes = settings.max_upload_mb * 1024 * 1024
     committed = False
     try:
-        ensure_free_space(storage_dir)
-        with partial_path.open("xb") as output:
-            while chunk := file.file.read(CHUNK_SIZE):
-                byte_count += len(chunk)
-                if byte_count > max_bytes:
-                    raise ApiError(f"视频不能超过 {settings.max_upload_mb} MB", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
-                if byte_count > stage_limit_bytes():
-                    raise ApiError(STAGE_LIMIT_MESSAGE, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
-                ensure_free_space(storage_dir, incoming_bytes=len(chunk))
-                digest.update(chunk)
-                output.write(chunk)
-        if not byte_count:
-            raise ApiError("视频文件为空", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+        byte_count, checksum = _write_upload(file, partial_path)
         duration = _probe_video(partial_path)
-        checksum = digest.hexdigest()
         if db.scalar(select(Video.id).where(Video.user_id == user.id, Video.upload_sha256 == checksum)):
             raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT)
 
@@ -121,6 +118,25 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
             partial_path.unlink(missing_ok=True)
             final_path.unlink(missing_ok=True)
         raise
+
+
+def _write_upload(file: UploadFile, path: Path) -> tuple[int, str]:
+    count = 0
+    digest = hashlib.sha256()
+    ensure_free_space(path.parent)
+    with path.open('xb') as output:
+        while chunk := file.file.read(CHUNK_SIZE):
+            count += len(chunk)
+            if count > settings.max_upload_mb * 1024 * 1024:
+                raise ApiError(f'视频不能超过 {settings.max_upload_mb} MB', 413)
+            if count > stage_limit_bytes():
+                raise ApiError(STAGE_LIMIT_MESSAGE, 413)
+            ensure_free_space(path.parent, incoming_bytes=len(chunk))
+            digest.update(chunk)
+            output.write(chunk)
+    if not count:
+        raise ApiError('视频文件为空', 415)
+    return count, digest.hexdigest()
 
 
 def _probe_video(path: Path) -> int | None:

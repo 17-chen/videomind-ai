@@ -7,6 +7,7 @@ from app.core.logging import logger
 from app.database.session import SessionLocal
 from app.models.video import Video, VideoStatus
 from app.services.analysis import analyze_video
+from app.services.file_storage import managed_file_store
 from app.services.rag import index_video
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.pipeline import process_video
@@ -20,22 +21,24 @@ def run_video_workflow_by_id(video_id: str, user_id: str) -> None:
         if video is None:
             logger.warning("Skipping workflow for missing or unowned video {}", video_id)
             return
-        run_video_workflow(db, video)
+        with managed_file_store(db) as store:
+            run_video_workflow(db, video, object_store=store)
     finally:
         db.close()
 
 
-def run_video_workflow(db: Session, video: Video) -> Video:
+def run_video_workflow(db: Session, video: Video, *, object_store=None) -> Video:
+    storage_options = {'object_store': object_store} if object_store is not None else {}
     stage = "download"
     try:
         if video.transcript is None or not video.transcript.content.strip():
             update_video_status(db, video, VideoStatus.TRANSCRIBING if video.source == "upload" else VideoStatus.DOWNLOADING)
-            process_video(db, video, final_status=VideoStatus.ANALYZING)
+            process_video(db, video, final_status=VideoStatus.ANALYZING, **storage_options)
 
         if video.summary is None:
             stage = "analysis"
             update_video_status(db, video, VideoStatus.ANALYZING)
-            analyze_video(db, video)
+            analyze_video(db, video, **storage_options)
 
         stage = "embedding"
         update_video_status(db, video, VideoStatus.EMBEDDING)
