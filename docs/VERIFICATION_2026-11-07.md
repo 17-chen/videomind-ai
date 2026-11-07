@@ -2,7 +2,7 @@
 
 ## Git 与范围
 
-从 `main` 的 `cb6e4ba`（上轮功能 `df1f8b2` 的 CI 记录）继续；开始时 fetch 后与 origin/main 一致。远端 `git@github.com:17-chen/videomind-ai.git`。原有未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交。当前轮次 GitHub 提交与 CI 结果在同步后补充。
+从 `main` 的 `cb6e4ba`（上轮功能 `df1f8b2` 的 CI 记录）继续；开始时 fetch 后与 origin/main 一致。远端 `git@github.com:17-chen/videomind-ai.git`。原有未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交。功能提交 `dfdc41c` 已正常推送；[CI 42345630901](https://github.com/17-chen/videomind-ai/actions/runs/42345630901) 后端和前端均通过。CI 包含全量测试、Ruff、hash 检索与前端构建/类型/lint，不使用真实外部服务。
 
 ## 本轮代码
 

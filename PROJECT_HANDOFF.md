@@ -4,7 +4,7 @@
 
 ## 1. 先读摘要
 
-**2026-11-07 更新：**R6 上传 API、笔记编辑与持久 Worker 已统一接入可选文件后端；上传先持久预留来源/总量配额，确认后才原子发布 Video。新增可选迁移 `20261107_o003`，默认 `FILE_STORAGE_BACKEND=local`，未切换现有环境。316 项后端测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过；真实 PostgreSQL/ffmpeg，身份、Supabase、ASR、LLM 和向量写入使用测试替身。旧文件迁移、pending 结果对账、真实双用户与云端持久性仍未验收。见 [核查](docs/VERIFICATION_2026-11-07.md)。
+**2026-11-07 更新：**功能提交 `dfdc41c` 已同步 GitHub，[CI 42345630901](https://github.com/17-chen/videomind-ai/actions/runs/42345630901) 后端与前端均通过。R6 上传 API、笔记编辑与持久 Worker 已统一接入可选文件后端；上传先持久预留来源/总量配额，确认后才原子发布 Video。新增可选迁移 `20261107_o003`，默认 `FILE_STORAGE_BACKEND=local`，未切换现有环境。316 项后端测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过；真实 PostgreSQL/ffmpeg，身份、Supabase、ASR、LLM 和向量写入使用测试替身。旧文件迁移、pending 结果对账、真实双用户与云端持久性仍未验收。见 [核查](docs/VERIFICATION_2026-11-07.md)。
 
 **2026-11-06 更新：**功能提交 `df1f8b2` 已同步 GitHub，[CI 42197987551](https://github.com/17-chen/videomind-ai/actions/runs/42197987551) 后端与前端均通过。R6 处理/分析/笔记编辑服务可显式注入对象客户端，已支持成组发布、按用户私有落地、对象 ID 引用及正文/引用与账本同事务提交；禁止本地/对象混用以防配额漏算。293 项后端测试/Ruff、前端隔离检查通过，含真实 PostgreSQL 并发/回滚和真实 ffmpeg；Supabase、ASR 与 LLM 响应为模拟。上传 API、持久 Worker 后端选择、迁移与真实云端验收仍待做，默认运行未切换。见 [说明](docs/OBJECT_STORAGE.md) 和 [核查](docs/VERIFICATION_2026-11-06.md)。
 
@@ -34,7 +34,7 @@
 - **交接时 Git 基线：**2026-10-27 已快进合入 GitHub 并行文档提交 `41d743d`（中英文 README）；此前功能与恢复预检提交为 `1242761`，CI 记录提交为 `5b19d36`。交接文档自身提交后，以新聊天实际 `git status`、`git log` 为准。原有未跟踪 `outputs/` 保留不动。
 - **最新后端证据：**2026-11-07，上传/持久 Worker 与来源预留接入；316 项后端测试（含真实 PostgreSQL 并发）及 Ruff 通过，见 [核查](docs/VERIFICATION_2026-11-07.md)。2026-10-27 只读密钥预检仍为 0 条密文、`inconclusive`，真实恢复未验收。
 - **最新前端证据：**2026-11-07 补充两条错误文案，一次性容器中当前源码隔离 build/typecheck/lint 及 4 项部署保护检查通过；实际预览版本 16.4.3 与四页 HTTP 200 是 2026-10-30 的运行证据；2026-10-25 的独立生产镜像与 `/auth` HTTP 检查为此前证据，临时副本不作为部署镜像。
-- **自动检查：**本轮功能提交 `df1f8b2` 的 [CI 42197987551](https://github.com/17-chen/videomind-ai/actions/runs/42197987551) 后端与前端均通过；上一轮目录权限失败与修复保留在 [2026-10-29 核查](docs/VERIFICATION_2026-10-29.md)。
+- **自动检查：**最新功能提交 `dfdc41c` 的 [CI 42345630901](https://github.com/17-chen/videomind-ai/actions/runs/42345630901) 后端与前端均通过；上一轮目录权限失败与修复保留在 [2026-10-29 核查](docs/VERIFICATION_2026-10-29.md)。
 - **2026-10-22 本地模型证据：**独立镜像的可选依赖与 `pip check` 通过；faster-whisper base 已转写合成中文音频及一个 NASA 真实公开视频。后者的 URL 下载、本地上传、无字幕缺 Key 失败路径在隔离数据库通过；真实 BGE 在固定虚构语料上完成隔离检索，详见 [核查记录](docs/VERIFICATION_2026-10-22.md)。
 - **下一步：**R6 上传/配额、持久 Worker/HTTP 后端工厂和 readiness 已接入；继续旧文件迁移、数量/摘要对账与回退；删除意图已接入，继续 pending 结果对账、用户整体删除与物理容量边界，再落实部署共享文件；不依赖外部账号时也可推进 R8 并发/合并空间预留、可恢复孤立文件清理及生产统一流量边界（只读聚合对账已补）（正式文件总量与本地认证前限流已有实现），并继续 R1 中文自然语音、跨主题检索与引用评测，R5 真实媒体故障演练。R2 真实分析/问答、R7 双用户和 R6/R9 云端验收需相应账号、资源或本人模型配置。
 - **本轮未完成的验收：**中文自然语音质量、真实笔记/向量/问答、Supabase/服务商调用和多实例运行仍待验证；英文公开视频的 72.73% Recall@2 也不是完整服务质量验收。
