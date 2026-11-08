@@ -579,7 +579,8 @@ def test_cleanup_cli_failure_never_prints_raw_error(monkeypatch, capsys):
     assert 'private-database-sentinel' not in capsys.readouterr().out
 
 
-def test_cleanup_transport_requires_confirmed_absence_before_marking_deleted(ledger, tmp_path, monkeypatch):
+@pytest.mark.parametrize('legacy', [False, True])
+def test_cleanup_transport_requires_confirmed_absence_before_marking_deleted(ledger, tmp_path, monkeypatch, legacy):
     from app.services.object_storage.cleanup import cleanup_requested_objects
     db, alice, _, video, memory = ledger
     path = tmp_path / f'{video}.md'
@@ -591,6 +592,8 @@ def test_cleanup_transport_requires_confirmed_absence_before_marking_deleted(led
         if request.method == 'DELETE':
             assert json.loads(request.read()) == {'prefixes': [spec.object_key]}
             return response(200)
+        if confirmed and legacy:
+            return response(400, json.dumps(MISSING_OBJECT).encode())
         return response(404 if confirmed else 200)
     store = client(handler)
     try:
@@ -654,5 +657,75 @@ def test_lower_stage_limit_does_not_block_cleanup_of_previously_large_object(tmp
         assert error.value.status_code == 413 and not seen
         store.delete(spec)
         assert seen == ['DELETE', 'GET']
+    finally:
+        store.close()
+
+
+MISSING_OBJECT = {'statusCode': '404', 'code': 'NoSuchKey', 'error': 'not_found', 'message': 'Object not found'}
+
+
+def test_hosted_typed_400_object_absence_supports_verify_and_delete():
+    seen = []
+    spec = spec_for()
+    def handler(request):
+        seen.append(request.method)
+        if request.method == 'DELETE':
+            assert json.loads(request.read()) == {'prefixes': [spec.object_key]}
+            return response(200)
+        assert request.url.path.endswith(spec.object_key)
+        return response(400, json.dumps(MISSING_OBJECT).encode())
+    store = client(handler)
+    try:
+        assert store.verify(spec) == 'absent'
+        store.delete(spec)
+        assert seen == ['GET', 'DELETE', 'GET']
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize('status,body,headers', [
+    (401, json.dumps(MISSING_OBJECT).encode(), {}),
+    (403, json.dumps(MISSING_OBJECT).encode(), {}),
+    (500, json.dumps(MISSING_OBJECT).encode(), {}),
+    (400, json.dumps(MISSING_OBJECT | {'code': 'NoSuchBucket'}).encode(), {}),
+    (400, json.dumps(MISSING_OBJECT | {'code': 'AccessDenied'}).encode(), {}),
+    (400, json.dumps(MISSING_OBJECT | {'statusCode': '403'}).encode(), {}),
+    (400, json.dumps(MISSING_OBJECT | {'message': 'Permission denied'}).encode(), {}),
+    (400, json.dumps({'statusCode': '404', 'error': 'not_found'}).encode(), {}),
+    (400, b'<html>private-provider-sentinel</html>', {}),
+    (400, b'[]', {}),
+    (400, b' ' * (64 * 1024) + json.dumps(MISSING_OBJECT).encode(), {}),
+    (400, json.dumps(MISSING_OBJECT).encode(), {'Content-Encoding': 'gzip'}),
+])
+def test_ambiguous_or_unauthorized_responses_never_confirm_absence(status, body, headers):
+    def handler(request):
+        if request.method == 'DELETE':
+            return response(200)
+        return response(status, body, headers=headers)
+    store = client(handler)
+    try:
+        with pytest.raises(ApiError) as error:
+            store.verify(spec_for())
+        assert error.value.message == UNAVAILABLE
+        with pytest.raises(ApiError):
+            store.delete(spec_for())
+    finally:
+        store.close()
+
+
+def test_legacy_error_body_stops_at_one_budgeted_block():
+    consumed = []
+    class Endless(httpx.SyncByteStream):
+        def __iter__(self):
+            for index in range(100):
+                consumed.append(index)
+                yield b'x' * (64 * 1024)
+        def close(self):
+            consumed.append('closed')
+    store = client(lambda request: httpx.Response(400, stream=Endless()))
+    try:
+        with pytest.raises(ApiError):
+            store.verify(spec_for())
+        assert consumed == [0, 'closed']
     finally:
         store.close()

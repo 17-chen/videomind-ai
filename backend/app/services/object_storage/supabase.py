@@ -56,6 +56,28 @@ class SupabaseObjectStore:
     def check_connection(self):
         self._private_bucket()
 
+    @staticmethod
+    def _object_absent(response):
+        if response.status_code == 404:
+            return True
+        # Some hosted Storage versions wrap NoSuchKey in HTTP 400. Only the
+        # exact typed object error is equivalent to 404, never arbitrary 400s,
+        # missing buckets, permission errors, or an unbounded provider body.
+        if response.status_code != 400 or response.headers.get('Content-Encoding', 'identity').lower() != 'identity':
+            return False
+        body = bytearray()
+        for chunk in response.iter_bytes(BLOCK_SIZE):
+            body.extend(chunk)
+            if len(body) >= BLOCK_SIZE:
+                return False
+        try:
+            error = json.loads(body)
+        except ValueError:
+            return False
+        return (isinstance(error, dict) and str(error.get('statusCode')) == '404'
+                and error.get('code') == 'NoSuchKey' and error.get('error') == 'not_found'
+                and error.get('message') == 'Object not found')
+
     def close(self):
         self._client.close()
 
@@ -162,7 +184,7 @@ class SupabaseObjectStore:
         count = 0
         deadline = time.monotonic() + self._transfer_seconds
         with self._request('GET', f'/object/authenticated/{self.bucket}/{spec.object_key}', headers={'Accept-Encoding': 'identity'}) as response:
-            if response.status_code == 404:
+            if self._object_absent(response):
                 return 'absent'
             if response.status_code != 200:
                 raise ApiError(UNAVAILABLE, 503)
@@ -188,6 +210,6 @@ class SupabaseObjectStore:
             if response.status_code not in (200, 204, 404):
                 raise ApiError(UNAVAILABLE, 503)
         # A successful remove response alone is not proof of disappearance.
-        with self._request('GET', f'/object/authenticated/{self.bucket}/{spec.object_key}') as response:
-            if response.status_code != 404:
+        with self._request('GET', f'/object/authenticated/{self.bucket}/{spec.object_key}', headers={'Accept-Encoding': 'identity'}) as response:
+            if not self._object_absent(response):
                 raise ApiError(UNAVAILABLE, 503)

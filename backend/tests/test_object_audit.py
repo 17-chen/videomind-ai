@@ -19,7 +19,7 @@ from app.services.object_storage.repository import SPEC_FIELDS
 from app.services.object_storage.spec import BLOCK_SIZE
 from app.services.object_storage.supabase import SupabaseObjectStore
 from scripts import audit_objects as cli
-from test_object_storage import BUCKET, KEY, PROJECT, client, response, spec_for
+from test_object_storage import BUCKET, KEY, MISSING_OBJECT, PROJECT, client, response, spec_for
 
 
 @pytest.fixture
@@ -110,11 +110,12 @@ def test_default_aggregates_preserve_intents_and_hide_identifiers(ledger):
     assert db.get(StoredArtifact, source.id).state == 'pending'
 
 
-def test_remote_match_and_404_never_release_or_publish_pending(ledger):
+@pytest.mark.parametrize('legacy', [False, True])
+def test_remote_match_and_404_never_release_or_publish_pending(ledger, legacy):
     db, _, owner, video = ledger
     first = add_row(db, owner, video, is_source_upload=True)
     second = add_row(db, owner, video, data=b'other', is_source_upload=True)
-    store = client(lambda request: response(200, b'synthetic') if request.url.path.endswith(first.object_key) else response(404))
+    store = client(lambda request: response(200, b'synthetic') if request.url.path.endswith(first.object_key) else response(400, json.dumps(MISSING_OBJECT).encode()) if legacy else response(404))
     try:
         report = audit_objects(db, store=store)
         assert report['remote']['matched'] == 1 and report['remote']['absent'] == 1

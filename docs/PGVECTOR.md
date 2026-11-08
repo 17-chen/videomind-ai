@@ -1,5 +1,7 @@
 # 可选共享 pgvector 向量后端
 
+2026-11-08：独立 Supabase PostgreSQL 17 已安装本项目 pgvector 迁移，当前连接/结构就绪检查通过，并收紧后端专用表权限。未进行真实 BGE 云端向量写入/检索闭环；原有本地 Chroma 未切换。见 [真实基础接入记录](VERIFICATION_2026-11-08_SUPABASE.md)。
+
 2026-11-03：R6 子项。`VECTOR_STORE_BACKEND=chroma` 仍为默认；`pgvector` 使用同一个 `DATABASE_URL` 保存向量，供 API 和 Worker 共享。没有自动切换现有环境，也没有复制或删除现有 Chroma 文件。未知后端值会拒绝启动，不静默回退。
 
 ## 适配语义
