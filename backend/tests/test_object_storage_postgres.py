@@ -590,3 +590,39 @@ def test_pending_source_unique_constraint_cannot_be_bypassed(object_db):
     with pytest.raises(IntegrityError):
         with engine.begin() as connection:
             connection.execute(sql, values | {'id': str(uuid4())})
+
+
+def test_object_audit_read_only_snapshot_and_concurrent_change(object_db):
+    from sqlalchemy import event
+    from app.services.object_storage.audit import audit_objects
+    from app.services.object_storage.repository import SPEC_FIELDS
+    from app.services.object_storage.spec import ArtifactSpec
+    engine, owner, ids = object_db
+    spec = ArtifactSpec(id=str(uuid4()), user_id=owner, video_id=ids[0], kind='note', filename=f'{ids[0]}.md',
+                        bucket='videomind-private', project_fingerprint='a' * 64, sha256='b' * 64, size_bytes=9)
+    with Session(engine) as db:
+        db.add(StoredArtifact(**{name: getattr(spec, name) for name in SPEC_FIELDS}, state='pending', is_source_upload=True))
+        db.commit()
+    readonly = []
+    def check_mode(connection, cursor, statement, parameters, context, executemany):
+        if 'GROUP BY vm_storage_objects.state' in statement:
+            readonly.append(connection.exec_driver_sql('SHOW transaction_read_only').scalar())
+    event.listen(engine, 'before_cursor_execute', check_mode)
+    try:
+        with Session(engine) as db:
+            class ConcurrentStore:
+                def verify(self, unused):
+                    assert not db.in_transaction()
+                    with engine.begin() as writer:
+                        writer.exec_driver_sql("SET LOCAL lock_timeout='500ms'")
+                        writer.execute(text("UPDATE vm_storage_objects SET delete_requested=true WHERE id=:id"), {'id': spec.id})
+                    return 'matched'
+            report = audit_objects(db, store=ConcurrentStore())
+            assert report['pending_source_bytes'] == 9
+            assert report['remote']['changed_during_check'] == 1
+            assert report['remote']['matched'] == 0
+            row = db.get(StoredArtifact, spec.id)
+            assert row.state == 'pending' and row.is_source_upload and row.delete_requested
+            assert readonly == ['on']
+    finally:
+        event.remove(engine, 'before_cursor_execute', check_mode)

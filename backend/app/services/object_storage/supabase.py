@@ -151,6 +151,35 @@ class SupabaseObjectStore:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
+    def verify(self, spec: ArtifactSpec):
+        """Observe one exact immutable key without disk writes or state changes.
+
+        A 404 is only a point-in-time observation, never deletion authorization.
+        Pending uploads may complete after this read, even when SQL is unchanged.
+        """
+        self._validate(spec, check_size=False)
+        digest = hashlib.sha256()
+        count = 0
+        deadline = time.monotonic() + self._transfer_seconds
+        with self._request('GET', f'/object/authenticated/{self.bucket}/{spec.object_key}', headers={'Accept-Encoding': 'identity'}) as response:
+            if response.status_code == 404:
+                return 'absent'
+            if response.status_code != 200:
+                raise ApiError(UNAVAILABLE, 503)
+            if response.headers.get('Content-Encoding', 'identity').lower() != 'identity':
+                return 'mismatch'
+            length = response.headers.get('Content-Length')
+            if length is not None and length != str(spec.size_bytes):
+                return 'mismatch'
+            for data in response.iter_raw(BLOCK_SIZE):
+                count += len(data)
+                if time.monotonic() > deadline:
+                    raise ApiError(UNAVAILABLE, 503)
+                if count > spec.size_bytes:
+                    return 'mismatch'
+                digest.update(data)
+        return 'matched' if count == spec.size_bytes and digest.hexdigest() == spec.sha256 else 'mismatch'
+
     def delete(self, spec: ArtifactSpec):
         # Deleting a remote object allocates no media cache; a lower local stage
         # limit must not prevent removing previously accepted larger objects.

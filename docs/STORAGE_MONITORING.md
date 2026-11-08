@@ -34,3 +34,7 @@ docker compose exec -T backend python -m scripts.storage_status
 2026-10-30 本机只读结果：扫描完整，活动任务 0；没有识别出 UUID 孤立文件、待提交 `.part` 或 `.staging-*`；9 个未归属普通文件共 6,798,912 字节全部保留。这个小型本地快照不代表云存储或长期负载验收。
 
 参见 [用户文件配额](STORAGE_QUOTA.md)、[恢复手册](RECOVERY_RUNBOOK.md) 和 [本轮核查](VERIFICATION_2026-10-30.md)。
+
+## 对象账本补充（2026-11-08）
+
+`python -m scripts.audit_objects` 默认仅 SQL 聚合，不读取文件或云端；显式 `--verify-remote` 才按精确键流式验证大小/摘要。数量/字节预算、并发变化检测和聚合输出见 [对象说明](OBJECT_STORAGE.md)。它与本地磁盘扫描范围不同，二者均不提供自动清理权限；pending 匹配或 404 不释放预留。本机因未安装对象表返回 not_installed，不代表真实云为空。

@@ -82,13 +82,39 @@ PostgreSQL 每次只锁一个对象，`SKIP LOCKED` 防止维护进程同时删�
 
 直接 SQL 删除、用户整体删除、旧记录缺失意图、无标记的 retired 对象都不在此命令自动范围内。恢复数据库前停止维护命令，核对数据库与对象快照；未完成云端恢复验收前不自行修改状态去强迫清理。
 
+## 只读账本与远端核查
+
+2026-11-08 新增可信运维命令，不提供浏览器用户接口：
+
+```bash
+cd backend
+python -m scripts.audit_objects
+python -m scripts.audit_objects --verify-remote --limit 20 --max-mb 512
+# 仅在暂停所有账本写入后跨批巡检；第二批示例
+python -m scripts.audit_objects --verify-remote --offset 20 --limit 20 --max-mb 512
+```
+
+默认只读取 SQL，汇总各状态条数/账本声明字节、pending 来源预留字节及缺少本人视频的 ready 数量；不创建云客户端、不打开本地业务文件。对象表未安装时返回 `not_installed`，条数/字节为未知空映射，不把它说成云端空桶。旧 schema 或 SQL 权限不足返回固定 error，不自动迁移。当前要求对象迁移 003。
+
+`--verify-remote` 才读取所配置私有桶中的账本精确键，通过真实响应流计算大小/SHA-256，不扫描 bucket 前缀、不写媒体缓存。仍先检查项目指纹和桶私有性，不跟随重定向、不过代理。高权限 Key 仅用于服务端维护，此命令不改变本人 LLM/ASR Key 规则。远端读取可能产生提供方请求/出网费用，默认不启用。
+
+按 UUID 排序取一批（limit 默认 20，范围 1–100）；max-mb 默认 512 MiB，范围 1–10240。每次读取前按账本字节 + 64 KiB 溢出块预留预算，即使失败也不归还本批预算；流超出声明大小最多再迭代一块即停止。预算限制对象响应正文，不含桶元数据、HTTP/TLS/内核缓冲；不是严格网络账单上限。继承连接/读取超时与传输检查点预算，不承诺整个命令有严格总时限。无需沿用媒体暂存文件上限，因为没有磁盘缓存。
+
+PostgreSQL 初始汇总/选取使用只读可重复读；释放事务后才访问网络。每次读取后在新只读事务复查整条元数据、状态、意图和更新时间，变化单独记 `changed_during_check`。不会锁对象/用户/视频行或在 GET 期间占 SQL 事务。它仍不是跨数据库和 Storage 的原子快照；对象可在后续变化，SQL 未变也不能证明远端上传已停止。跨批 offset（范围 0–1000000）只适合已暂停写入的人工巡检，并发增删会造成跨批遗漏/重复。
+
+只输出聚合，不包含用户/视频/对象 ID、邮箱、文件名、摘要、bucket/项目/Key 或异常正文。remote 的 matched/absent/mismatch/failed 为非 deleted 对象的读取结果；deleted_absent 是已删除对象当时不存在，deleted_present 表示又读到内容。changed_during_check 不当作稳定匹配；skipped_budget 或 truncated 表示本批不能覆盖所选后续范围。源账本条数/字节始终为初始快照，remote 计数不能当作最新账本总量。
+
+状态 `preview` 为仅账本预览，`observed` 为选定批次没有发现上述异常；均不表示完成全桶清单、业务引用迁移或真实服务验收。初始存在 pending/缺少本人视频的 ready，或远端发现缺失/不符/失败/变化/已删除对象再出现/预算跳过/后续截断，返回 `needs_attention`、退出 2；固定 error 也退出 2。其余退出 0，包括未安装；必须结合字段理解，不能只凭退出码判定可上线。offset>0 只覆盖该位置起的一批，不宣称已核查前面的对象。
+
+**所有结果均保持 `observations_only=true`、`writes_performed=false`。pending 即使匹配或 404 也保持原状态和额度；不会创建 Video、恢复旧版、释放预留、退休或删除对象。** 有凭据地解决未决上传和旧文件迁移仍需后续实现，不能用手改账本绕过这一边界。
+
 ## 后续接入顺序与真实验收
 
 1. 上传/来源额度、处理/分析/笔记、持久 Worker/HTTP 工厂与预检已接入；继续旧文件迁移与远端物理容量/预留，解除混用保护必须有数量/摘要对账证据。
-2. 视频删除意图与已确认对象的显式重试已接入；继续 pending 结果对账、用户整体删除、无标记旧对象迁移和读取在途边界，不把本命令当成通用垃圾回收。
+2. 视频删除意图与已确认对象的显式重试已接入；只读汇总与远端观察已补；继续有凭据地解决 pending、用户整体删除、无标记旧对象迁移和读取在途边界，不把本命令当成通用垃圾回收。
 3. 提供本地旧文件迁移、数量/摘要核对和回退方案；显式模式选择不执行这些操作，不要直接切换已有用户。
 4. 使用真实私有 bucket、后端角色和两个账号，验证 API/Worker 跨实例读取、重部署后持久性、服务商失败/删除语义、桶策略与恢复。高权限凭证绕过 Storage RLS，应用归属检查不可省略；桶元数据检查也不能阻止管理员随后将桶改成 public。
 
-当前证据包括真实本地文件、loopback HTTP 和一次性 PostgreSQL；Supabase 响应、用户及角色均为模拟。真实 Supabase 注册/JWT、Storage 网络/API/策略/费用、真实模型调用均未验收，见 [基础核查](VERIFICATION_2026-11-04.md) 、[删除核查](VERIFICATION_2026-11-05.md) 、[处理服务核查](VERIFICATION_2026-11-06.md) 和 [上传/统一后端核查](VERIFICATION_2026-11-07.md)。
+当前证据包括真实本地文件、loopback HTTP 和一次性 PostgreSQL；Supabase 响应、用户及角色均为模拟。真实 Supabase 注册/JWT、Storage 网络/API/策略/费用、真实模型调用均未验收，见 [基础核查](VERIFICATION_2026-11-04.md) 、[删除核查](VERIFICATION_2026-11-05.md) 、[处理服务核查](VERIFICATION_2026-11-06.md) 、[上传/统一后端核查](VERIFICATION_2026-11-07.md) 和 [只读对账核查](VERIFICATION_2026-11-08.md)。
 
 协议依据：[Supabase 私有下载](https://supabase.com/docs/guides/storage/serving/downloads)、[API Key 与 secret Key 用法](https://supabase.com/docs/guides/getting-started/api-keys)。
