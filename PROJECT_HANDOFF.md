@@ -1,5 +1,22 @@
 # VideoMind AI 完整交接文档
 
+## 当前交接：2026-11-08（优先于下方历史记录）
+
+- **当前目标：**完成真实账号/本人模型体验验收，再准备受保护部署。用户刚要求结束本聊天并交接，勿自动创建新聊天。
+- **代码与检查：**功能基线 `37efbf9` 已同步 main；[CI 42459704977](https://github.com/17-chen/videomind-ai/actions/runs/42459704977) 前后端通过。前端 7 项测试及隔离 build/typecheck/lint 通过；后端 359 项全量/Ruff 属此前存储轮次，另有本地 ASR 相关 10 项测试，不是交接时重跑。
+- **人工确认：**用户完成注册/邮箱确认并登录；登录跳转和任务完成状态修复后明确回复“两项都正常”，随后说“现在生成内容了”。没有检查生成正文或付费服务商账单，不据此认定问答/引用、整条模型链和双用户已验收。
+- **当前首要待确认：**用户追问状态应自动更新。代码处理期约每 3 秒读取本人视频/任务，终态停止轮询并 router.refresh 更新详情；旧页面需刷新一次加载新代码。尚未独立验证“从新任务入队直到笔记出现，全程不手动刷新”的完整浏览器过程。新聊天先复核这个体验，不要求用户重做已完成视频，也不自动重跑收费阶段。
+- **交接时只读复核：**3001 /auth 与 8002 /api/v1/health/live 均 200，云前端/API/Worker 三个容器均运行；本轮仅文档与存活检查，未重跑模型任务。
+- **当前运行：**云预览前端 `http://localhost:3001`、API `http://localhost:8002/api/v1`；容器 videomind-preview-frontend/api/worker。原演示仍 3000/8001，local/Chroma，用户曾误打开旧页面。云端为 Supabase Auth/PostgreSQL 17/私有 Storage/pgvector，embedding_provider 仍 local_hash，并非真实 BGE 云检索验收。Supabase Site URL=3001。
+- **转写：**云 API/Worker 使用已有 videomind-ai-local-ai-probe 镜像和当前源码，本地 Whisper base、CPU/int8，模型离线加载；用户的 DeepSeek 用于笔记/问答，不用 OpenAI 转写 Key。原模型缓存读取超时未覆盖，独立新缓存见私有目录 asr-model-cache。成功任务约 111 秒是整任务耗时，不是独立 ASR 基准；未宣称计算提速。
+- **本机私有配置：**`~/Library/Application Support/VideoMind AI/` 中 `.env.preview.local`、frontend-public.json、launch-backend.py、launch-frontend.cjs、frontend-preview、证书、状态文件、模型与备份；不回显、不提交真实配置。3001 前端来自私有源码副本，后续改前端须将相关源码同步到该副本并验证，单改仓库不会自动更新 3001。不要全量覆盖或带入 .env/旧 .next。
+- **资源/回退：**用户已授权 Colima 扩容至 4GB，Docker socket `unix:///Users/chenxin/.colima/default/docker.sock`。旧云 API/Worker 保存在带 `-before-local-asr-20261108` 后缀的停止容器，禁止与新 Worker 同时启动。重启前先核对活动队列；不删除数据卷、不重建加密主密钥。
+- **下一步顺序：**自动更新浏览器全程复核 → 当前账号真实笔记/问答引用与本人模型错误路径 → 第二真实账号数据/Key 隔离 → 删除/重启持久性及隔离恢复 → 受保护公网预发布。R6 旧文件迁移/pending 安全解决、R8 并发空间/统一限流与监控、R1 中文质量/真实性能仍未完成。
+- **保护现状：**原未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交、不清理。交接仅改文档；新聊天以实际 Git/运行检查为准，历史发布授权不替代新请求。
+
+证据：[真实 Supabase 基础接入](docs/VERIFICATION_2026-11-08_SUPABASE.md)、[本地转写运行](docs/VERIFICATION_2026-11-08_LOCAL_ASR.md)、[登录/时间/终态 UI](docs/VERIFICATION_2026-11-08_UI.md)。
+
+
 2026-11-08 界面修复：登录成功改为持久化会话后的完整文档跳转，避免复用登录前导航；日期显式 Asia/Shanghai，消除服务端 UTC 与浏览器时区的 hydration 差异；视频操作直接按本人接口刷新视频/任务，终态停止轮询并恢复按钮，completed 阶段补中英文。7 项前端测试与隔离 build/typecheck/lint 通过；已更新 3001，用户明确反馈登录和完成状态两项均正常。后台成功任务实际耗时约 111 秒，不是持续转写；未证明 ASR 计算加速或完整模型链验收。见 [核查](docs/VERIFICATION_2026-11-08_UI.md)。
 
 2026-11-08 转写运行修复：排查发现用户停留在 3000 旧演示页面；独立云预览仍为 3001/8002。云预览 API/Worker 已启用本地 Whisper base（CPU/int8），DeepSeek 仍由各用户本人配置用于笔记/问答，无需 OpenAI 转写 Key。已复用本地 AI 镜像，在非文稿同步私有目录建立新模型缓存；原缓存读取超时，保留未覆盖。真实 Worker 离线模型加载、合成静音解码、HTTP ready=200 及 10 项相关隔离测试通过。未自动重跑真实视频或调用付费模型，真实内容质量与端到端仍未验收，见 [记录](docs/VERIFICATION_2026-11-08_LOCAL_ASR.md)。

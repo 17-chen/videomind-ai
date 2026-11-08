@@ -1,33 +1,20 @@
 # 在新聊天恢复 VideoMind AI
 
-2026-11-08 最新接入：先看 [真实 Supabase 基础接入记录](VERIFICATION_2026-11-08_SUPABASE.md)。359 项后端测试与前端隔离检查通过，真实云空库/私有桶基础已验证；现有预览仍 local/Chroma，双用户与本人模型未验收。私有状态在本机 `~/Library/Application Support/VideoMind AI/`，仅输出布尔结果，不回显凭证。用户已明确授权并完成 Colima 4GB 扩容；独立云预览前端 3001/API 8002/Worker 运行，原本地 3000/8001 恢复；Site URL=3001。不要把已运行和真实双账号/模型验收混淆。
+更新：2026-11-08。新聊天连接本机真实仓库后，可以依赖已提交文件恢复；聊天历史和旧镜像不是当前运行事实。完整进度见 [PROJECT_HANDOFF 当前交接](../PROJECT_HANDOFF.md)。
 
-更新时间：2026-11-08。**新聊天不能保证读取旧聊天全文或记住本次对话。** 若连接同一台电脑的真实仓库，它可以读取已提交的项目文档并重新核对代码和 Git；若只看到 ChatGPT 项目镜像或没有本地仓库，需要手动提供文档与源码。聊天记录本身不能代替验收证据。
+复制以下文字到新聊天：
 
-## 新聊天可访问本机真实仓库
+> 继续 VideoMind AI。真实仓库是 `/Users/chenxin/Documents/Codex 2/videomind-ai`。先读 `AGENTS.md`、`PROJECT_HANDOFF.md` 顶部当前交接、`PROJECT_CONTEXT.md`、`docs/COMPLETION_PLAN.md`、`TODO.md`，再核对 Git 工作树、最近提交和远端。最新功能基线 `37efbf9` 的 GitHub CI 前后端通过；后续交接文档提交以实际 HEAD 为准。当前云预览是 3001/8002，使用 Supabase Auth/SQL/私有 Storage/pgvector、本地 Whisper base 转写和用户本人的 DeepSeek；embedding 仍 local_hash。3000/8001 是旧本地演示，不要混淆。用户已确认登录和任务完成显示正常，并说内容已生成；优先复核“从入队到生成内容自动出现，全程不用手动刷新”的浏览器体验，再继续问答引用、双账号隔离、重启持久性/恢复和受保护部署。不要重新处理已完成视频或擅自重复付费模型调用。保留 `outputs/`、`backend/:memory:.ses`，不读取或提交其内容；保留所有用户数据和现有主密钥。3001 前端从私有源码副本运行，改仓库后须同步对应源码并验证。区分代码实现、模拟测试、真实运行和用户人工确认。完成后运行相关检查、更新文档并核对远端后同步 GitHub，不强制推送；中文报告。
 
-选择本项目或目录 `/Users/chenxin/Documents/Codex 2/videomind-ai`，发送：
+## 恢复时应核对
 
-> 继续 VideoMind AI。真实仓库在 `/Users/chenxin/Documents/Codex 2/videomind-ai`。先读 `AGENTS.md`、`PROJECT_HANDOFF.md`、`PROJECT_CONTEXT.md`、`docs/COMPLETION_PLAN.md`、`TODO.md`，再核对当前源码、Git 工作树、最近提交和远端。以仓库最新项目交接和有日期验证记录恢复进度，不把旧聊天或文档里的历史 Git 快照当成当前状态。R3 上传、R4 编辑已有本地实现；R1/R5/R8 仍在推进，R2/R7 真实服务验收和 R6/R9 云端交付未完成。先做不依赖我开通账号的剩余工作，保留原有未跟踪文件。不要把模拟登录、虚构语料、合成密文或单条公开视频转写当成真实服务完整验收。完成后运行相关检查、更新有证据的交接/计划/TODO/CHANGELOG，并按本次授权核对远端后同步 GitHub；不强制推送。用中文说明结果与未验收边界。
+- `git status --short --branch`、`git log -6 --oneline`、remote；不 reset/清理未知文件。
+- [真实 Supabase 接入](VERIFICATION_2026-11-08_SUPABASE.md)、[Whisper 配置](VERIFICATION_2026-11-08_LOCAL_ASR.md)、[UI 修复](VERIFICATION_2026-11-08_UI.md)。359 项后端全量、10 项 ASR 相关测试、7 项前端测试均各有范围/日期，不代表新聊天已重跑。
+- Colima 已获授权扩至 4GB，socket 为 `unix:///Users/chenxin/.colima/default/docker.sock`。重启前仍检查队列，保留原数据卷。
+- 私有配置、启动器、前端运行副本、CA、新 ASR 缓存及备份在本机 `~/Library/Application Support/VideoMind AI/`，只能输出脱敏状态，不回显内容。当前 frontend-preview 与仓库独立，不能假设改源码会自动热更新 3001。
+- 保留的旧云 API/Worker 带 `-before-local-asr-20261108` 后缀且停止；不得同时启动旧/新 Worker。完整回退说明见本地转写记录。
+- 约 111 秒是一次成功任务整体耗时，不能当成 ASR 单独速度/中文质量或完整服务商验收。用户已说生成内容，不再要求重做注册；下一步补证据。
 
-新聊天要先看实际 `git status --short --branch` 和 `git log -6 --oneline`。2026-10-27 本次交接前已快进到 GitHub 文档提交 `41d743d`；本次交接若再有新提交，应以实际 HEAD 为准。原有未跟踪 `outputs/`、`backend/:memory:.ses` 要保留。若进入 ChatGPT 项目镜像目录，`sources/` 只读，业务文件必须改在真实 Git 仓库。
+未完成：自动更新完整浏览器验证、真实问答引用、双用户/各自 Key、真实备份恢复与删除/重启持久性、旧文件迁移与 pending 解决、资源与生产限流监控、目标平台部署。公开部署没有完成，当前是本机连接云服务的预览；部署决策见 [部署时机](DEPLOYMENT_READINESS.md)。
 
-## 新聊天无法访问本机仓库
-
-提供 [完整交接](../PROJECT_HANDOFF.md) 与 [剩余计划](COMPLETION_PLAN.md)，并给出可访问的 GitHub 仓库或源码。只有文档时可以恢复背景和计划，不能声称已经检查当前工作树、运行测试或访问真实服务。本机 `.env`、数据库、视频文件和模型缓存不在 GitHub 中；不要上传 API Key、令牌、Cookie、主密钥或真实用户资料。
-
-## 恢复成功应确认
-
-1. 指向真实仓库，报告当前分支、工作树、HEAD 与远端关系；保护已有改动。
-2. 用 [交接状态表](../PROJECT_HANDOFF.md) 和 [R1–R9 计划](COMPLETION_PLAN.md) 说明已实现、模拟通过、真实验收三个层次。
-3. 阅读最新 [2026-11-08 核查](VERIFICATION_2026-11-08.md)，知道 343 项后端测试/Ruff、只读对象核查与默认未切换的边界；这不是新聊天自动重跑的结果。
-4. 知道只读主密钥检查在本机因 0 条用户密文返回 `inconclusive`，真实恢复与轮换仍待演练。
-5. 从未完成且不依赖账号的任务继续，不重复实现已有的中英文、个人 Key、上传、编辑、持久任务或自动检查基础。
-
-部署阶段恢复先看 [部署时机](DEPLOYMENT_READINESS.md)：可以开始准备受保护预发布，真实公开验收尚未完成；不能将 API/Worker 分别放到两块独立 Render 磁盘而假设文件共享。
-
-2026-11-03 新增可选 pgvector，本机仍为 Chroma；下一步先继续对象存储。恢复前读 [pgvector 说明](PGVECTOR.md)，不要将本地真实 SQL 或虚构语料误作 Supabase 云端验收。
-
-2026-11-07 上传、编辑和持久 Worker 的可选文件工厂已接入，默认仍 local/Chroma。继续旧文件迁移、pending 结果对账和真实云端验收，先读 [对象说明](OBJECT_STORAGE.md)，不要重复实现入口。
-
-2026-11-08 已有 `scripts.audit_objects` 只读汇总/显式远端观察；它不释放预留或修改状态。继续有凭据的 pending 解决协议、旧文件迁移和真实目标验收，勿把 404/摘要匹配当成安全回收授权。
+没有本机仓库时，提供交接文档和 GitHub 源码即可恢复背景，但不能声称已检查本机运行或私有配置。不要上传密码、Key、Cookie、令牌、用户资料或备份归档。
