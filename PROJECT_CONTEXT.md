@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
+
 > 最后核对：2026-11-08。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。

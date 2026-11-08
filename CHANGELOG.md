@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
+
 记录有意义的用户可见变更和工程变更。最新日期置顶。
 
 ## 2026-11-08 — Supabase 基础接入与实际错误协议修复
