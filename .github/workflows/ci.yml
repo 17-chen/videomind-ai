@@ -81,8 +81,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
-      - name: Verify deployment configuration guard
-        run: node --test scripts/check-deployment.test.mjs
+      - name: Verify deployment configuration and UI regressions
+        run: node --test scripts/*.test.mjs
       - name: Build frontend
         run: npm run build
       - name: Check frontend types

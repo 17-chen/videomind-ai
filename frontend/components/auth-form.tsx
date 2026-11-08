@@ -2,7 +2,6 @@
 
 import { useTranslator } from "@/lib/language";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, LogIn, UserPlus } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -12,7 +11,6 @@ type AuthMode = "login" | "signup";
 
 export function AuthForm() {
   const tx = useTranslator();
-  const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,8 +42,13 @@ export function AuthForm() {
         setMessage(tx("注册成功，请前往邮箱完成验证后登录。"));
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      if (!result.data.session) {
+        setError(tx("登录未建立会话，请重试。"));
+        return;
+      }
+      // Start a fresh document request after the SDK has persisted cookies.
+      // An App Router navigation can reuse a pre-login /auth redirect.
+      window.location.replace("/dashboard");
     } catch {
       setError(tx("认证服务暂不可用，请稍后重试。"));
     } finally {

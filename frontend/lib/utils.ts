@@ -1,3 +1,4 @@
+import { formatTimestamp } from "@/lib/date";
 import type { Video } from "@/lib/types";
 import { translate, type Language } from "@/lib/i18n";
 import { clsx, type ClassValue } from "clsx";
@@ -9,12 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(value: string | null | undefined, language: Language = "zh") {
   if (!value) return translate(language, "未完成");
-  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
+  return formatTimestamp(value, language) ?? translate(language, "未完成");
 }
 
 export function statusLabel(status: string) {
