@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-08 转写运行修复：排查发现用户停留在 3000 旧演示页面；独立云预览仍为 3001/8002。云预览 API/Worker 已启用本地 Whisper base（CPU/int8），DeepSeek 仍由各用户本人配置用于笔记/问答，无需 OpenAI 转写 Key。已复用本地 AI 镜像，在非文稿同步私有目录建立新模型缓存；原缓存读取超时，保留未覆盖。真实 Worker 离线模型加载、合成静音解码、HTTP ready=200 及 10 项相关隔离测试通过。未自动重跑真实视频或调用付费模型，真实内容质量与端到端仍未验收，见 [记录](docs/VERIFICATION_2026-11-08_LOCAL_ASR.md)。
+
 2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
 
 记录有意义的用户可见变更和工程变更。最新日期置顶。
