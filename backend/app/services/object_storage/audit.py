@@ -22,13 +22,13 @@ def ledger_snapshot(db):
         return report
     for state, count, size in db.execute(select(StoredArtifact.state, func.count(), func.sum(StoredArtifact.size_bytes))
                                         .group_by(StoredArtifact.state)):
-        report['counts'][state] = count
-        report['bytes'][state] = size
+        report['counts'][state] = int(count)
+        report['bytes'][state] = int(size)
     for state in ('pending', 'ready', 'retired', 'deleted'):
         report['counts'].setdefault(state, 0)
         report['bytes'].setdefault(state, 0)
-    report['pending_source_bytes'] = db.scalar(select(func.coalesce(func.sum(StoredArtifact.size_bytes), 0)).where(
-        StoredArtifact.state == 'pending', StoredArtifact.is_source_upload.is_(True)))
+    report['pending_source_bytes'] = int(db.scalar(select(func.coalesce(func.sum(StoredArtifact.size_bytes), 0)).where(
+        StoredArtifact.state == 'pending', StoredArtifact.is_source_upload.is_(True))))
     owned_video = exists(select(Video.id).where(Video.id == StoredArtifact.video_id, Video.user_id == StoredArtifact.user_id))
     report['ready_without_owned_video'] = db.scalar(select(func.count()).select_from(StoredArtifact).where(
         StoredArtifact.state == 'ready', ~owned_video))

@@ -5,6 +5,7 @@
 ## 2026-11-08 — 对象只读核查与有界远端校验
 
 - 新增 `python -m scripts.audit_objects`，默认仅 SQL 聚合；显式远端模式对精确键流式验证大小/SHA-256，支持数量/字节预算和分批位置，不落地媒体缓存、不输出身份或地址。
+- PostgreSQL 字节聚合显式转整数，避免 SUM(bigint) 的 Decimal 无法输出 JSON；真实库报告序列化回归通过。
 - 核查期间不占 SQL 事务/行锁，前后值变化单独计数；pending 匹配/404 均不释放预留或改变状态，deleted 再出现会提示关注。无 schema 的本地环境不创建云客户端。
 - R6/R8 新增对象账本只读汇总与显式远端摘要核查；分批/字节预算、并发变化检测和脱敏输出已验证，始终不修改状态、释放额度或删除对象。343 项后端测试/Ruff、前端隔离 build/typecheck/lint 及 4 项保护用例通过；真实 PostgreSQL 与本地 HTTP，云响应仍为模拟。本机默认只读检查返回 not_installed，环境未切换；安全解决 pending、旧文件迁移和真实云验收仍待做。见 [核查](docs/VERIFICATION_2026-11-08.md)。
 

@@ -618,7 +618,11 @@ def test_object_audit_read_only_snapshot_and_concurrent_change(object_db):
                         writer.execute(text("UPDATE vm_storage_objects SET delete_requested=true WHERE id=:id"), {'id': spec.id})
                     return 'matched'
             report = audit_objects(db, store=ConcurrentStore())
+            import json
             assert report['pending_source_bytes'] == 9
+            assert isinstance(report['pending_source_bytes'], int)
+            assert isinstance(report['bytes']['pending'], int)
+            assert json.loads(json.dumps(report))['counts']['pending'] == 1
             assert report['remote']['changed_during_check'] == 1
             assert report['remote']['matched'] == 0
             row = db.get(StoredArtifact, spec.id)

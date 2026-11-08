@@ -4,6 +4,8 @@
 
 起点 `main=9e7a8c4`，开始 fetch 后与 origin/main 一致，远端为 `git@github.com:17-chen/videomind-ai.git`。原有未跟踪 `outputs/` 与 `backend/:memory:.ses` 保留，不读取内容、不提交。本轮沿 R6/R8 补只读账本/远端观察，不修改已部署环境、主密钥、用户数据或迁移版本；不是旧文件迁移或未决上传解决器。
 
+功能提交 `c98aad2` 已正常推送，[CI 42444875044](https://github.com/17-chen/videomind-ai/actions/runs/42444875044) 前后端均通过。随后最终复核补 PostgreSQL 聚合整数转换与 JSON 序列化断言，后端 343 项和 Ruff 再次通过。
+
 ## 实现
 
 - `python -m scripts.audit_objects` 默认仅 SQL 聚合，未安装账本时不创建云客户端；远端需显式 `--verify-remote`。输出固定聚合字段，异常脱敏，无身份、精确键、bucket、摘要或凭证。
@@ -18,7 +20,7 @@
 | --- | --- |
 | 后端全量 | 无特权用户 65534：**343 passed**，无跳过；启用 PostgreSQL 配额/pgvector/对象集成用例 |
 | Ruff | `ruff check app tests scripts alembic_pgvector alembic_objects` 通过 |
-| 真实 PostgreSQL | 一次性 tmpfs PostgreSQL：核查事务 `transaction_read_only=on`，远端模拟读取期间独立连接可修改对象意图（500 ms 锁超时下成功），结果标记变化、不释放 pending 预留；既有迁移/并发/回滚回归通过 |
+| 真实 PostgreSQL | 一次性 tmpfs PostgreSQL：核查事务 `transaction_read_only=on`，远端模拟读取期间独立连接可修改对象意图（500 ms 锁超时下成功），结果标记变化、不释放 pending 预留；确认 SUM(bigint) 返回 Decimal 后显式转换整数，真实 PostgreSQL 报告 JSON 序列化断言及再次全量 343 项通过；既有迁移/并发/回滚回归通过 |
 | 真实本地 HTTP | 多块正文读取、大小/摘要校验，无媒体缓存；服务端模拟 Supabase 协议，不是实际 Supabase |
 | 新增边界 | 缺失/损坏/超长/编码不符/权限/跳转/公共桶/错误项目拒绝、无限正文一块溢出即止、失败占用预算、批次截断/offset、元数据损坏不访问远端、未提交改动拒绝、CLI 关闭客户端及输出脱敏通过 |
 | 状态保护 | GET 匹配或 404 均保持 pending、来源标志和预留；SQL 监听未发现核查写语句；deleted 缺失为正常观察、再次读到内容需关注 |

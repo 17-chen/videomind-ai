@@ -35,7 +35,7 @@ Phase 1–6 已有基础实现。Phase 7 的迁移、健康检查和生产构建
 
 ## 验证状态
 
-**2026-11-08 补充：**R6/R8 新增对象账本只读汇总与显式远端摘要核查；分批/字节预算、并发变化检测和脱敏输出已验证，始终不修改状态、释放额度或删除对象。343 项后端测试/Ruff、前端隔离 build/typecheck/lint 及 4 项保护用例通过；真实 PostgreSQL 与本地 HTTP，云响应仍为模拟。本机默认只读检查返回 not_installed，环境未切换；安全解决 pending、旧文件迁移和真实云验收仍待做。见 [核查](docs/VERIFICATION_2026-11-08.md)。
+**2026-11-08 补充：**功能提交 `c98aad2` 已同步，[CI 42444875044](https://github.com/17-chen/videomind-ai/actions/runs/42444875044) 前后端均通过；后续补 PostgreSQL 聚合 JSON 类型修复，343 项本地全量复测通过。R6/R8 新增对象账本只读汇总与显式远端摘要核查；分批/字节预算、并发变化检测和脱敏输出已验证，始终不修改状态、释放额度或删除对象。343 项后端测试/Ruff、前端隔离 build/typecheck/lint 及 4 项保护用例通过；真实 PostgreSQL 与本地 HTTP，云响应仍为模拟。本机默认只读检查返回 not_installed，环境未切换；安全解决 pending、旧文件迁移和真实云验收仍待做。见 [核查](docs/VERIFICATION_2026-11-08.md)。
 
 **2026-11-07 补充：**功能提交 `dfdc41c` 已同步 GitHub，[CI 42345630901](https://github.com/17-chen/videomind-ai/actions/runs/42345630901) 后端与前端均通过。R6 上传 API、笔记编辑与持久 Worker 已统一接入可选文件后端；上传先持久预留来源/总量配额，确认后才原子发布 Video。新增可选迁移 `20261107_o003`，默认 `FILE_STORAGE_BACKEND=local`，未切换现有环境。316 项后端测试/Ruff、前端 4 项保护用例及隔离 build/typecheck/lint 通过；真实 PostgreSQL/ffmpeg，身份、Supabase、ASR、LLM 和向量写入使用测试替身。旧文件迁移、pending 结果对账、真实双用户与云端持久性仍未验收。见 [核查](docs/VERIFICATION_2026-11-07.md)。
 
