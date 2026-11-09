@@ -69,7 +69,9 @@ def test_own_key_video_to_private_chat(monkeypatch, tmp_path):
                     video_id=doc["video_id"], title=doc["title"], url=doc["url"],
                     category=doc["category"], document=doc["document"], distance=0.1,
                 )
-                for doc in documents.values() if doc["user_id"] == user_id
+                # Deliberately faulty index: SQL ownership checks must still
+                # prevent another user's context from reaching the model.
+                for doc in documents.values()
             ][:limit]
 
     monkeypatch.setattr(pipeline, "download_video", download)
@@ -113,11 +115,13 @@ def test_own_key_video_to_private_chat(monkeypatch, tmp_path):
             assert own_chat.json()["sources"][0]["video_id"] == video_id
             assert ("key", "alice-secret-key", "https://api.deepseek.com") in calls
 
+            calls_before_other_user = list(calls)
             other_detail = client.get(f"/api/v1/videos/{video_id}", headers=auth("bob"))
             other_chat = client.post("/api/v1/chat", headers=auth("bob"), json={"question": "What did Alice save?", "language": "en"})
             assert other_detail.status_code == 404
             assert other_chat.status_code == 200
             assert other_chat.json()["sources"] == []
+            assert calls == calls_before_other_user
             assert not any(call[0] == "key" and call[1] == "owner-key-must-not-be-used" for call in calls if isinstance(call, tuple))
     finally:
         app.dependency_overrides.pop(get_db, None)

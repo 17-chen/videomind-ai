@@ -1,5 +1,7 @@
 # VideoMind AI 当前技术架构
 
+> 2026-11-09：问答在向量 user_id 过滤后，以业务库 Video 存在性和本人归属再次筛选；过滤后无资料不调用模型，SQL 失败不回退索引。上下文与前端来源卡片按相同顺序编号。见 [核查与边界](VERIFICATION_2026-11-09.md)。
+
 > 2026-11-08：[对象只读核查](OBJECT_STORAGE.md) 默认只做 SQL 聚合；显式远端模式按精确键计算摘要、核对读取期间变化。只观察，不解决 pending 或释放额度。
 
 > 2026-11-07：上传 API、笔记编辑和持久 Worker 共用 `managed_file_store`，可选 Supabase 前先检查账本/私有桶；源上传预留后再传输，Video 与 ready 原子发布。默认 local，既有环境未迁移；[说明与边界](OBJECT_STORAGE.md)。

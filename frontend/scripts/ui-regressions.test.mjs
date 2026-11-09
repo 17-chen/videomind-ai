@@ -203,5 +203,5 @@ test('chat renders returned citations as owner detail links and sends the chosen
   assert.match(text(tree), /Evidence from the saved transcript/);
   const link = nodes(tree).find(node => node.type === 'a');
   assert.equal(link.props.href, '/videos/synthetic-owner-video');
-  assert.equal(text(link), 'Synthetic source');
+  assert.match(text(link), /\[1\]\s+Synthetic source/);
 });

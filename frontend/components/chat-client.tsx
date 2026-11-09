@@ -88,10 +88,10 @@ export function ChatClient() {
           {result.sources.length ? (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-muted-foreground">{tx("引用视频记忆")}</p>
-              {result.sources.map((source) => (
+              {result.sources.map((source, index) => (
                 <Panel key={source.video_id} className="p-5">
                   <a href={`/videos/${source.video_id}`} className="text-lg font-black hover:text-accent">
-                    {source.title}
+                    {`[${index + 1}] ${source.title}`}
                   </a>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{source.snippet}</p>
                   <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
