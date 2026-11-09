@@ -1,5 +1,7 @@
 # 本地数据与用户密钥恢复手册
 
+2026-11-08 当前云预览补充：按现有启动器加载 `/run/secrets/cloud.env` 后，只读密钥校验返回 verified（1 条配置、1 条密文）；裸 `docker exec` 不会继承启动器加载的 dotenv，必须在导入 settings 前加载同一配置。此证据只证明当前主密钥匹配，不证明备份或隔离恢复。见 [本轮核查](VERIFICATION_2026-11-08_ACCEPTANCE.md)。
+
 2026-11-08 云端补充：独立测试项目迁移前已用 PostgreSQL 17 pg_dump 生成私有归档，pg_restore --list 通过；完整隔离恢复尚未执行。私有云配置与归档位于本机 `~/Library/Application Support/VideoMind AI/`，不在仓库或文稿同步目录。凭证与主密钥须独立保护，数据库归档不包含对象内容，不能以目录可读代替恢复成功。见 [真实基础接入记录](VERIFICATION_2026-11-08_SUPABASE.md)。
 
 > 2026-11-08：新增 [对象只读核查](OBJECT_STORAGE.md)，默认仅 SQL 汇总，显式远端观察不修改状态或释放预留。恢复后可用于发现摘要/缺失及核查期间变化；分批完整性需暂停写入并人工核对，不可凭 404 清理 pending。真实云端恢复仍未验收。

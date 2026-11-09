@@ -22,7 +22,7 @@ export function VideoActions({ video }: { video: ActionVideo }) {
   const [task, setTask] = useState<VideoTask | null>(null);
   const [snapshot, setSnapshot] = useState<ActionVideo | null>(null);
   const currentVideo = snapshot?.id === video.id ? snapshot : video;
-  const active = activeStatuses.has(currentVideo.status);
+  const active = activeStatuses.has(currentVideo.status) || task?.status === "queued" || task?.status === "running";
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +55,10 @@ export function VideoActions({ video }: { video: ActionVideo }) {
     try {
       const result =
         action === "all" ? await runVideo(video.id) : action === "process" ? await processVideo(video.id) : action === "analyze" ? await analyzeVideo(video.id) : await embedVideo(video.id);
+      if (result.status === "queued") {
+        setSnapshot({ ...currentVideo, status: "queued" });
+        setTask(null);
+      }
       setQueuedMessage("message" in result);
       setMessage("message" in result ? result.message : action === "analyze" ? tx("AI 分析已完成") : tx("操作完成"));
     } catch (err) {
