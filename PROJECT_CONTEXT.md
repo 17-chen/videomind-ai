@@ -1,6 +1,6 @@
 # 项目上下文
 
-2026-11-09：推进 R2/R7 问答来源保护。生成前按业务库复核候选 Video 的本人归属和存在性，过滤重复/空正文；无有效资料不调用模型，SQL 失败不信任索引回退。上下文与来源卡片统一 [1] 编号。369 项后端测试/Ruff、12 项前端回归及隔离 build/typecheck/lint 通过；3001 来源卡片与云 API 已更新，未调用真实模型或重跑视频。真实引用质量、双账号、全程自动更新与恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-09.md)。
+2026-11-09：功能提交 `6d7986e` 已同步 GitHub，[CI 42555093216](https://github.com/17-chen/videomind-ai/actions/runs/42555093216) 前后端及固定检索检查通过。推进 R2/R7 问答来源保护。生成前按业务库复核候选 Video 的本人归属和存在性，过滤重复/空正文；无有效资料不调用模型，SQL 失败不信任索引回退。上下文与来源卡片统一 [1] 编号。369 项后端测试/Ruff、12 项前端回归及隔离 build/typecheck/lint 通过；3001 来源卡片与云 API 已更新，未调用真实模型或重跑视频。真实引用质量、双账号、全程自动更新与恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-09.md)。
 
 2026-11-08 验收推进：修复入队响应及任务/视频快照错位时按钮提前解锁，补逐阶段轮询/错误重试/卸载与问答引用渲染回归。12 项前端测试、隔离 build/typecheck/lint；一次性 PostgreSQL 下 359 项后端测试/Ruff 通过，已同步 3001 单个组件。真实页面可见已有笔记，云队列活动/失败/过期均 0；现有 1 条用户密文以当前主密钥校验 verified，不等于备份恢复。未重复处理视频或调用模型；第二账号尚未准备，真实全过程自动更新、问答引用质量、双账号和隔离恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-08_ACCEPTANCE.md)。
 
@@ -40,7 +40,7 @@ Phase 1–6 已有基础实现；当前处于真实云预览验收和上线保�
 - 数据：PostgreSQL 保存用户、视频、转写、摘要和向量映射；本地目录保存视频、音频和笔记。
 - 视频：yt-dlp 下载、字幕优先，缺字幕时抽取音频；默认 `ASR_PROVIDER=disabled`，可选安装本地 faster-whisper 或使用用户的 OpenAI 转写 Key。
 - AI：DeepSeek 默认用于分析和回答；默认 `local_hash` embedding + ChromaDB 提供基础 RAG 流程，新增可选共享 pgvector 后端，可选本地中文 BGE 模型与分段索引。
-- 认证：默认 demo user；Supabase 注册登录及后端 Auth 服务令牌验证代码正在接入。
+- 认证：默认 demo user；可选 Supabase 注册登录和后端令牌验证已实现，当前独立云预览使用 Supabase；真实双用户验收待完成。
 - 本地编排：Docker Compose 默认启动 PostgreSQL、Adminer、backend、frontend；Chroma 使用后端嵌入式持久化，独立服务是可选 profile。
 
 详见 [当前架构](docs/architecture.md)。
