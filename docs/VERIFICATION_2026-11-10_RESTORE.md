@@ -10,6 +10,8 @@
 
 ## 检查
 
+最终功能 `0a2b93c` 已同步 GitHub，[CI 42838499156](https://github.com/17-chen/videomind-ai/actions/runs/42838499156) 前后端及固定检索检查全部通过。
+
 - 新增 14 项测试，覆盖真实 PostgreSQL 的内容匹配、同数量内容变化、高精度 JSON 数值变化、列/字符长度/迁移版本/缺表差异、行/字节预算、拒绝自身比较、只读事务、无主键/异常脱敏、RLS 过滤拒绝及 CLI 缺目标/无效 URL/无效预算。
 - 当前源码 `python -m pytest -q` 全量 394 项通过，`ruff check app tests scripts` 通过；三组 PostgreSQL opt-in 检查开启，使用无外网的一次性 PostgreSQL/pgvector 与临时源码副本。身份、ASR、对象服务和模型响应仍为替身，既有真实 SQL/本地媒体检查一并通过。仅原有 LangGraph 弃用警告。
 - 首次针对性检查发现流式选项污染连接后续语句，改为单条 execute 的作用域后通过。又保留原始 row_to_json 表示作摘要，避免 JSON 浮点解析把真实数值差异舍入；对应回归通过；最终复核补齐列长度、精度与 collation 元数据，防止只看类型名漏掉结构差异。Colima 不共享宿主 /tmp，初始演练脚本改用标准输入，之后保存为可复现 fixture；只读挂载的 Ruff 使用 --no-cache 检查通过。
