@@ -38,3 +38,7 @@ docker compose exec -T backend python -m scripts.storage_status
 ## 对象账本补充（2026-11-08）
 
 `python -m scripts.audit_objects` 默认仅 SQL 聚合，不读取文件或云端；显式 `--verify-remote` 才按精确键流式验证大小/摘要。数量/字节预算、并发变化检测和聚合输出见 [对象说明](OBJECT_STORAGE.md)。它与本地磁盘扫描范围不同，二者均不提供自动清理权限；pending 匹配或 404 不释放预留。本机因未安装对象表返回 not_installed，不代表真实云为空。
+
+## 按需阈值检查（2026-11-10）
+
+`python -m scripts.check_operations` 提供队列等待、过期租约、近期失败与本地磁盘最小余量的阈值和 0/1/2 退出码，不扫描业务文件。读取失败与超限分别报告；它不执行清理、不提供空间预留或持续告警，见 [运营监控说明](OPERATIONS_MONITORING.md)。
