@@ -26,7 +26,9 @@ def _shape(connection, table):
         # A filtered view can make two incomplete copies appear equal.
         raise VerificationUnavailable()
     columns = connection.execute(text('''
-        SELECT column_name, udt_schema, udt_name, is_nullable, column_default
+        SELECT column_name, udt_schema, udt_name, is_nullable, column_default,
+               character_maximum_length, numeric_precision, numeric_scale,
+               datetime_precision, collation_schema, collation_name
         FROM information_schema.columns
         WHERE table_schema='public' AND table_name=:table ORDER BY ordinal_position
     '''), {'table': table}).all()

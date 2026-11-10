@@ -22,7 +22,7 @@ python -m scripts.verify_database_restore --max-rows 100000 --max-bytes 67108864
 
 必需业务表：users、videos、transcripts、summaries、embeddings、ai_settings、video_tasks、request_windows。可选范围：三组 alembic_version 表、vm_vector_chunks 和 vm_storage_objects；可选表在两侧都不存在时记为 not_present，仅一侧存在则 mismatch。必需表缺失不能通过。
 
-按列顺序比对名称、PostgreSQL 类型/schema、可空性、默认值与主键；随后按主键顺序流式读取 PostgreSQL row_to_json 的原始 UTC 表示，使用带长度边界的 SHA-256 摘要。不会经 Python 浮点解析，避免把高精度 JSON 数值差异舍入成相同。匹配要求行数与摘要均相同；JSON 格式/键顺序变化也可能被视为差异，工具不是语义等价判定器。
+按列顺序比对名称、PostgreSQL 类型/schema、字符长度/数值及时间精度/collation、可空性、默认值与主键；随后按主键顺序流式读取 PostgreSQL row_to_json 的原始 UTC 表示，使用带长度边界的 SHA-256 摘要。不会经 Python 浮点解析，避免把高精度 JSON 数值差异舍入成相同。匹配要求行数与摘要均相同；JSON 格式/键顺序变化也可能被视为差异，工具不是语义等价判定器。
 
 只返回固定表名、状态、行数、读取总量及固定原因代码。行正文、用户标识、连接地址、密文、内部摘要和异常原文都不返回、不写文件；加密字段参与内容比对但不在此命令中解密。`writes_performed=false` 恒定。
 

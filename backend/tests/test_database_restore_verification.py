@@ -85,11 +85,12 @@ def test_high_precision_json_change_is_not_rounded_into_a_match(databases):
 
 
 @requires_postgres
-@pytest.mark.parametrize('change', ['column', 'missing_optional', 'version'])
+@pytest.mark.parametrize('change', ['column', 'column_type', 'missing_optional', 'version'])
 def test_schema_and_migration_changes_are_detected(databases, change):
-    if change == 'column':
+    if change in ('column', 'column_type'):
         with databases[1].begin() as db:
-            db.execute(text('ALTER TABLE users ADD COLUMN unexpected TEXT'))
+            db.execute(text('ALTER TABLE users ADD COLUMN unexpected TEXT') if change == 'column'
+                       else text('ALTER TABLE users ALTER COLUMN email TYPE VARCHAR(100)'))
         name = 'users'
     else:
         for engine in databases:
