@@ -1,5 +1,6 @@
 """SQL-authoritative source checks with deliberately faulty index results."""
 
+from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -70,6 +71,24 @@ def test_untrusted_index_is_filtered_before_prompt_and_source_numbering(library)
     assert '[3]' not in context
     assert '不得编造来源' in prompts[0]['messages'][0]['content']
     assert result.answer == 'Grounded answer [1]'
+
+
+def test_source_metadata_comes_from_owned_video_not_stale_index(library):
+    db, alice, (first, _, _), candidates, _, prompts = library
+    first.source = 'upload'
+    first.user_category = 'Current category'
+    db.commit()
+    candidates.append(replace(hit(first.id), title='STALE_TITLE',
+                              url='https://example.com/STALE_URL', category='STALE_CATEGORY'))
+
+    result = rag.chat_with_videos(db, alice, 'Question', 5)
+
+    assert [(source.title, source.url, source.category) for source in result.sources] == [
+        ('First', f'/videos/{first.id}', 'Current category')
+    ]
+    context = prompts[0]['messages'][1]['content']
+    assert f'标题：First\n链接：/videos/{first.id}\n分类：Current category' in context
+    assert 'STALE_' not in context
 
 
 @pytest.mark.parametrize('language', ['zh', 'en'])

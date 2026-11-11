@@ -67,15 +67,24 @@ def chat_with_videos(db: Session, user: User, question: str, limit: int, languag
     # The business database is authoritative even if an index is stale after a
     # restore or returns a record outside its requested owner filter. Do this
     # before constructing sources or sending any context to the model.
-    owned_ids = set(db.scalars(select(Video.id).where(
+    owned_videos = {video.id: video for video in db.scalars(select(Video).where(
         Video.user_id == user.id,
         Video.id.in_([result.video_id for result in candidates]),
-    ))) if candidates else set()
+    ))} if candidates else {}
     seen: set[str] = set()
     results = []
     for result in candidates:
-        if result.video_id in owned_ids and result.video_id not in seen and result.document.strip():
-            results.append(result)
+        video = owned_videos.get(result.video_id)
+        if video is not None and result.video_id not in seen and result.document.strip():
+            summary = video.summary
+            results.append(VectorSearchResult(
+                video_id=video.id,
+                title=video.title or (summary.title if summary else None) or "未命名视频",
+                url=f"/videos/{video.id}" if video.source == "upload" else video.url,
+                category=video.user_category or (summary.category if summary else None),
+                document=result.document,
+                distance=result.distance,
+            ))
             seen.add(result.video_id)
     if not results:
         return RagChatResult(answer="No relevant videos found in your library yet." if language == "en" else t("no_relevant_videos"), sources=[])

@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-11：问答候选通过业务库归属核验后，来源标题、链接和分类也取业务库当前值，避免沿用过期索引元信息；片段仍取索引。11 项来源测试与 Ruff 在隔离只读容器通过；未调用付费模型或更新云预览，真实引用质量待验收。
+
 2026-11-10 恢复推进：最终功能 `0a2b93c` 已同步 GitHub，[CI 42838499156](https://github.com/17-chen/videomind-ai/actions/runs/42838499156) 前后端及固定检索检查全部通过。新增只读数据库恢复比对命令，覆盖8张业务表及5张可选迁移/向量/对象表的选定结构与内容；拒绝自身比较和 RLS 过滤视图，预算不足不判匹配。394 项后端测试/Ruff 通过；一次性 PostgreSQL 16 实际 pg_dump/pg_restore 的合成13表匹配、合成密文可解、同数量正文改变可检出。真实 Supabase 17、用户主密钥与对象文件恢复仍未验收；未操作真实备份或付费模型。见 [恢复核查](docs/VERIFICATION_2026-11-10_RESTORE.md) 与 [比对说明](docs/RESTORE_VERIFICATION.md)。
 
 2026-11-10：功能 `d1dd39c` 已同步 GitHub，[CI 42744791214](https://github.com/17-chen/videomind-ai/actions/runs/42744791214) 前后端及固定检索检查通过。R8 新增只读运营阈值命令 check_operations，覆盖排队过久、过期租约、近期失败及本地低磁盘余量，提供 0/1/2 退出码和脱敏 JSON；读取失败不伪装健康。380 项后端测试/Ruff 通过，API/Worker 各自只读实测为 ok；未重启服务、重跑视频或调用模型。生产调度/通知、空间预留、真实双账号和完整恢复仍待做。见 [本轮核查](docs/VERIFICATION_2026-11-10.md) 与 [监控说明](docs/OPERATIONS_MONITORING.md)。
