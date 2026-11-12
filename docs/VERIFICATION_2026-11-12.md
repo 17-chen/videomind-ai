@@ -17,6 +17,8 @@
 
 ## 全量与预览
 
+功能 `e67de3f` 已同步 GitHub，[CI 43165117133](https://github.com/17-chen/videomind-ai/actions/runs/43165117133) 前后端及固定检索检查全部通过。
+
 - 当前源码全量397项后端测试及 `ruff check app tests scripts` 通过，一次性 PostgreSQL/pgvector 启用三组 opt-in 检查，无外部网络/真实配置/业务卷；新增2项进程测试使用隔离SQLite和模拟空间反馈。仅原有LangGraph弃用警告。
 - 前端未修改，不重跑本地前端构建；GitHub CI仍检查前后端。
 - 真实云队列只读核对 queued/running/failed/expired 均0、succeeded=1 后，重载预览API/Worker以加载本轮音频保护及并行问答元信息代码。未重新入队、运行视频或调用模型，现有配置、主密钥和业务卷保留。更新后 ready=200（数据库/向量/私有文件后端 ok）、3001 /auth=200，三个预览容器运行；一次性测试数据库已移除。
