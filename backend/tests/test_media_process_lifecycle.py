@@ -122,10 +122,23 @@ def reap_orphan():
         assert libc.prctl(36, previous.value, 0, 0, 0) == 0
 
 
-def spawn_worker(job, *, paced=True, timeout=30):
+def spawn_worker(job, *, paced=True, timeout=30, space_failure=None):
     root, database, _, _, _, wrapper, _ = job
+    code = WORKER
+    if space_failure:
+        fault = '''
+from app.core.errors import ApiError
+from app.services.temporary_storage import FREE_SPACE_MESSAGE
+def check_space(path):
+    if any(p.stat().st_size > 0 for p in path.glob('*.mp3')):
+        if SPACE_FAILURE == 'low':
+            raise ApiError(FREE_SPACE_MESSAGE, 507)
+        raise OSError('private-probe-error-must-not-leak')
+audio.ensure_free_space = check_space
+'''.replace('SPACE_FAILURE', repr(space_failure))
+        code = code.replace('engine = create_engine(database)', fault + '\nengine = create_engine(database)')
     return subprocess.Popen(
-        [sys.executable, '-c', WORKER, str(root), database, str(wrapper) if paced else '', str(timeout)],
+        [sys.executable, '-c', code, str(root), database, str(wrapper) if paced else '', str(timeout)],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
@@ -213,6 +226,51 @@ def test_audio_timeout_reaps_process_and_cleans_only_its_stage(media_job):
             assert task.video.transcript is None
         assert original.read_bytes() == b'previous-published-audio'
         assert not list((root / 'audio').glob('.staging-*'))
+    finally:
+        if worker.poll() is None:
+            worker.kill()
+            worker.wait(timeout=10)
+
+
+@pytest.mark.parametrize('failure', ['low', 'probe_error'])
+def test_audio_space_failure_stops_real_process_and_preserves_published_output(media_job, failure):
+    from app.services.temporary_storage import FREE_SPACE_MESSAGE
+    root, _, engine, task_id, original, _, pid_file = media_job
+    unrelated = root / 'audio' / '.staging-unrelated'
+    unrelated.mkdir()
+    marker = unrelated / 'leave-alone.txt'
+    marker.write_bytes(b'untouched')
+    worker = spawn_worker(media_job, space_failure=failure)
+    try:
+        assert worker.wait(timeout=30) == 0
+        assert pid_file.exists()
+        assert not Path(f'/proc/{int(pid_file.read_text())}').exists()
+        with Session(engine) as db:
+            task = db.get(VideoTask, task_id)
+            assert task.status == 'failed'
+            assert task.video.audio_path is None
+            assert task.video.transcript is None
+            assert 'private-probe' not in (task.error or '')
+            if failure == 'low':
+                assert task.error == FREE_SPACE_MESSAGE
+        assert original.read_bytes() == b'previous-published-audio'
+        assert marker.read_bytes() == b'untouched'
+        assert list((root / 'audio').glob('.staging-*')) == [unrelated]
+        with Session(engine) as db:
+            task = db.get(VideoTask, task_id)
+            video, user = task.video, task.user
+            retry_id = video_tasks.enqueue_video_task(db, user, video, 'process').id
+        retry = spawn_worker(media_job, paced=False)
+        try:
+            assert retry.wait(timeout=30) == 0
+        finally:
+            if retry.poll() is None:
+                retry.kill()
+                retry.wait(timeout=10)
+        with Session(engine) as db:
+            assert db.get(VideoTask, retry_id).status == 'succeeded'
+        assert original.read_bytes() != b'previous-published-audio'
+        assert marker.read_bytes() == b'untouched'
     finally:
         if worker.poll() is None:
             worker.kill()

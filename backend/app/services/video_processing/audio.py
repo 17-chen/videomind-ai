@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from time import monotonic
 
 from app.core.config import settings
 from app.services.storage_quota import artifact_directory
@@ -11,6 +12,31 @@ from app.core.errors import ApiError
 from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, ensure_free_space, stage_limit_bytes
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import ExtractedAudio
+
+
+def _run_audio_command(command: list[str], output_dir: Path) -> int:
+    timeout = settings.audio_extraction_timeout_seconds
+    # No pipes: raw tool output is neither shown nor accumulated in memory.
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    deadline = monotonic() + timeout
+    try:
+        while process.poll() is None:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            try:
+                process.wait(timeout=min(0.5, remaining))
+            except subprocess.TimeoutExpired:
+                ensure_free_space(output_dir)
+        if process.returncode:
+            raise subprocess.CalledProcessError(process.returncode, command)
+        return process.returncode
+    finally:
+        # Includes low space, failed space probes, timeout and caller errors.
+        # Reap before staging cleanup so no child can keep writing into it.
+        if process.poll() is None:
+            process.kill()
+        process.wait()
 
 
 def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
@@ -46,13 +72,7 @@ def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
     ]
 
     try:
-        completed = subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=settings.audio_extraction_timeout_seconds,
-        )
+        returncode = _run_audio_command(command, output_dir)
     except subprocess.TimeoutExpired as exc:
         raise VideoProcessingError(t("audio_extraction_timeout")) from exc
     except subprocess.CalledProcessError as exc:
@@ -60,7 +80,7 @@ def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
             raise ApiError(STAGE_LIMIT_MESSAGE, 413) from exc
         raise VideoProcessingError(t("audio_extraction_failed")) from exc
 
-    if completed.returncode != 0 or not output_path.exists():
+    if returncode != 0 or not output_path.exists():
         raise VideoProcessingError(t("audio_output_missing"))
 
     if output_path.stat().st_size >= limit:
