@@ -14,6 +14,8 @@
 
 ## 验证证据
 
+功能 `ba07ed9` 已同步 GitHub，[CI 43350954201](https://github.com/17-chen/videomind-ai/actions/runs/43350954201) 前后端及固定检索检查全部通过。一次性测试集群及其中归档已移除；原未跟踪文件保留。
+
 - 新增13项：10种数据不变而结构丢失/改变场景，2种数据库实际反解析再解析的 CHECK/部分索引场景，1项词元保护回归；恢复比对模块共27项测试。
 - 最终源码全量 **410项后端测试**、`ruff check app tests scripts` 通过。无外网 PostgreSQL/pgvector 16 一次性容器，源码复制到 tmpfs，三组 PostgreSQL/pgvector/对象 opt-in 测试启用；仅已有 LangGraph 弃用警告。
 - 同一隔离集群中按 restore_probe fixture 执行三组迁移、合成两账号与13表；同版本真实 pg_dump/pg_restore 后，13表匹配，两侧共26行/7498字节；合成密文1条校验 verified。随后仅改变目标转写正文、行数不变，准确返回 mismatch。归档只在一次性容器中，未使用真实配置或应用主密钥。
