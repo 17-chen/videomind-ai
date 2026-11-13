@@ -1,5 +1,7 @@
 # 隔离数据库恢复比对
 
+2026-11-13：结构范围扩展至约束和索引，包含外键动作、延迟属性、CHECK 验证状态及索引运行状态。正常 pg_dump/pg_restore 的 varchar 数组转 text 数组反解析差异有定向兼容，见 [核查](VERIFICATION_2026-11-13.md)。
+
 2026-11-10：R6/R8 子项。`python -m scripts.verify_database_restore` 只读取已经存在的源库和隔离恢复库，不执行备份、恢复、迁移、创建/删除数据库或修复数据。它用于在实际 pg_restore 后核对选定范围，不把“归档目录可读”或“行数相同”当作内容恢复证据。
 
 ## 输入与隔离
@@ -22,18 +24,22 @@ python -m scripts.verify_database_restore --max-rows 100000 --max-bytes 67108864
 
 必需业务表：users、videos、transcripts、summaries、embeddings、ai_settings、video_tasks、request_windows。可选范围：三组 alembic_version 表、vm_vector_chunks 和 vm_storage_objects；可选表在两侧都不存在时记为 not_present，仅一侧存在则 mismatch。必需表缺失不能通过。
 
-按列顺序比对名称、PostgreSQL 类型/schema、字符长度/数值及时间精度/collation、可空性、默认值与主键；随后按主键顺序流式读取 PostgreSQL row_to_json 的原始 UTC 表示，使用带长度边界的 SHA-256 摘要。不会经 Python 浮点解析，避免把高精度 JSON 数值差异舍入成相同。匹配要求行数与摘要均相同；JSON 格式/键顺序变化也可能被视为差异，工具不是语义等价判定器。
+按列顺序比对名称、PostgreSQL 类型/schema、字符长度/数值及时间精度/collation、可空性、默认值与主键。还比对所选表的约束名称/类型、PostgreSQL 定义及 convalidated 状态，以及索引名称、定义和 valid/ready/live 状态；定义涵盖外键动作、唯一/排斥约束、延迟属性、CHECK、索引表达式/谓词/INCLUDE 和定义中呈现的选项。只读取目录，不执行约束表达式、不重建索引，也不保证原有未验证约束或无效索引可用。
 
-只返回固定表名、状态、行数、读取总量及固定原因代码。行正文、用户标识、连接地址、密文、内部摘要和异常原文都不返回、不写文件；加密字段参与内容比对但不在此命令中解密。`writes_performed=false` 恒定。
+两侧统一 search_path 和字符串设置，SQL 定义按词元比较，字符串和带引号标识符保持原样。PostgreSQL 在实际恢复时会把无长度限制 varchar 字面量数组整体转 text[] 改写为逐元素转 text；仅定向归一化该无损差异。不是通用 SQL 等价证明器：其他等价表达式、更名或跨版本反解析变化仍可能保守报 schema_difference，需人工核对，不能据此自动修复或放宽校验。
+
+随后按主键顺序流式读取 PostgreSQL row_to_json 的原始 UTC 表示，使用带长度边界的 SHA-256 摘要。不会经 Python 浮点解析，避免把高精度 JSON 数值差异舍入成相同。匹配要求行数与摘要均相同；JSON 格式/键顺序变化也可能被视为差异，工具不是语义等价判定器。
+
+只返回固定表名、状态、行数、读取总量及固定原因代码。行正文、用户标识、连接地址、密文、内部摘要、约束/索引名称及定义和异常原文都不返回、不写文件；加密字段参与内容比对但不在此命令中解密。`writes_performed=false` 恒定。
 
 | 状态 | 退出码 | 含义 |
 | --- | --- | --- |
 | matched | 0 | 选定范围的所有必需/已安装可选表匹配 |
-| mismatch | 1 | 存在缺表、列结构/主键或内容差异 |
+| mismatch | 1 | 存在缺表、列/约束/索引结构或内容差异 |
 | inconclusive | 2 | 读取预算不足，未完成全部比对 |
 | unavailable | 2 | 未设置目标、目标不满足隔离约束、权限/连接/结构读取失败或不支持的后端 |
 
-没有主键无法稳定排序，返回 unavailable。结构比对不覆盖索引、非主键约束/外键、触发器、函数、序列状态、RLS 策略定义或授权；拒绝受 RLS 过滤的读取不等于验证恢复后的角色权限正确。非白名单表、Supabase auth/storage 管理表、扩展版本和远端文件内容均不在范围中。
+没有主键无法稳定排序，返回 unavailable。结构比对不覆盖触发器、函数实现、序列状态、物理存储布局、RLS 策略定义或授权；表达式引用的函数/类型/操作符实现也未比对。拒绝受 RLS 过滤的读取不等于验证恢复后的角色权限正确。非白名单表、Supabase auth/storage 管理表、扩展版本和远端文件内容均不在范围中。
 
 匹配也不证明备份主密钥可解、对象文件可下载、实际身份可登录或问答正确。之后仍须单独运行密钥校验、对象摘要/文件恢复与真实双账号验收，不要直接切换到恢复库或启动可能调用模型的 Worker。
 

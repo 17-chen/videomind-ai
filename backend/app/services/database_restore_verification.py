@@ -2,6 +2,7 @@
 
 from contextlib import ExitStack
 import hashlib
+import re
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
@@ -21,6 +22,45 @@ class BudgetExceeded(Exception):
     pass
 
 
+def _definition_tokens(definition):
+    # PostgreSQL's deparser can emit (ARRAY['x'::varchar])::text[];
+    # pg_restore reparses it as ARRAY[('x'::varchar)::text]. Normalize
+    # ONLY this unbounded varchar literal-array cast, which is lossless.
+    # Tokenize quoted strings/identifiers as opaque units: never rewrite text
+    # inside a literal. All other expression differences remain conservative.
+    tokens = re.findall(
+        r'''[eE]'(?:[^'\\]|\\.|'')*'|'(?:[^']|'')*'|"(?:[^"]|"")*"'''
+        r'''|[A-Za-z_][A-Za-z_0-9$]*|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'''
+        r'''|::|[+*/<>=~!@#%^&|`?-]+|[^\s]''', definition,
+    )
+    result = []
+    i = 0
+    while i < len(tokens):
+        if tokens[i:i + 3] == ['(', 'ARRAY', '[']:
+            j, items = i + 3, []
+            while j + 3 < len(tokens):
+                literal = tokens[j]
+                if not (literal.startswith("'") and literal.endswith("'")) or tokens[j + 1:j + 4] != ['::', 'character', 'varying']:
+                    break
+                items.append(literal)
+                j += 4
+                if tokens[j:j + 1] != [',']:
+                    break
+                j += 1
+            if items and tokens[j:j + 6] == [']', ')', '::', 'text', '[', ']']:
+                result.extend(['ARRAY', '['])
+                for position, literal in enumerate(items):
+                    if position:
+                        result.append(',')
+                    result.extend(['(', literal, '::', 'character', 'varying', ')', '::', 'text'])
+                result.append(']')
+                i = j + 6
+                continue
+        result.append(tokens[i])
+        i += 1
+    return tuple(result)
+
+
 def _shape(connection, table):
     if connection.scalar(text('SELECT row_security_active(CAST(:table AS regclass))'), {'table': f'public.{table}'}):
         # A filtered view can make two incomplete copies appear equal.
@@ -35,7 +75,29 @@ def _shape(connection, table):
     primary_key = inspect(connection).get_pk_constraint(table, schema='public')['constrained_columns']
     if not primary_key:
         raise VerificationUnavailable()
-    return columns, primary_key
+    # Catalog definitions retain FK actions, deferrability, CHECK expressions,
+    # partial/expression indexes, included columns and index options. Compare
+    # names too: a restore should reproduce the same named schema objects.
+    # Never return these definitions in the public report (they can contain
+    # sensitive literals). Runtime index state also matters after a failed DDL.
+    constraints = connection.execute(text('''
+        SELECT conname, contype, pg_get_constraintdef(oid, false), convalidated
+        FROM pg_constraint
+        WHERE conrelid=CAST(:table AS regclass)
+        ORDER BY conname
+    '''), {'table': f'public.{table}'}).all()
+    indexes = connection.execute(text('''
+        SELECT indexrelid::regclass::text, pg_get_indexdef(indexrelid),
+               indisvalid, indisready, indislive
+        FROM pg_index
+        WHERE indrelid=CAST(:table AS regclass)
+        ORDER BY indexrelid::regclass::text
+    '''), {'table': f'public.{table}'}).all()
+    constraints = [(name, kind, _definition_tokens(definition), validated)
+                   for name, kind, definition, validated in constraints]
+    indexes = [(name, _definition_tokens(definition), valid, ready, live)
+               for name, definition, valid, ready, live in indexes]
+    return columns, primary_key, constraints, indexes
 
 
 def _digest(connection, table, primary_key, budget, max_rows, max_bytes):
@@ -87,6 +149,9 @@ def compare_database_restore(source: Engine, restored: Engine, *, max_rows=10000
                 stack.enter_context(connection.begin())
                 connection.execute(text('SET TRANSACTION READ ONLY'))
                 connection.execute(text("SET LOCAL TIME ZONE 'UTC'"))
+                # Deparser output must not depend on the two roles' defaults.
+                connection.execute(text('SET LOCAL search_path = pg_catalog, public'))
+                connection.execute(text('SET LOCAL standard_conforming_strings = on'))
                 connection.execute(text("SET LOCAL statement_timeout = '15000ms'"))
                 connection.execute(text("SET LOCAL lock_timeout = '3000ms'"))
                 connections.append(connection)

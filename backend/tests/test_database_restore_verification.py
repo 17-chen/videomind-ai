@@ -11,12 +11,26 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.database.base import Base
 from app.models import User, Video
-from app.services.database_restore_verification import compare_database_restore
+from app.services.database_restore_verification import compare_database_restore, _definition_tokens
 from scripts import verify_database_restore
 
 
 requires_postgres = pytest.mark.skipif(os.environ.get('RUN_POSTGRES_QUOTA_TESTS') != '1',
     reason='Requires disposable PostgreSQL databases')
+
+
+def test_dump_reparse_array_cast_is_normalized_without_rewriting_quoted_content():
+    before = "CHECK (state = ANY ((ARRAY['it''s pending'::character varying, 'ready'::character varying])::text[]))"
+    after = "CHECK (state = ANY (ARRAY[('it''s pending'::character varying)::text, ('ready'::character varying)::text]))"
+    assert _definition_tokens(before) == _definition_tokens(after)
+    # Identical syntax embedded inside a string/identifier is opaque; changed
+    # predicates and bounded casts must never disappear in normalization.
+    assert _definition_tokens(before) != _definition_tokens(after.replace("'ready'", "'deleted'"))
+    assert _definition_tokens(before) != _definition_tokens(after.replace('varying', 'varying(4)'))
+    assert _definition_tokens('a ~ ~ b') != _definition_tokens('a ~~ b')
+    assert _definition_tokens('12') != _definition_tokens('1 2')
+    for quoted in ('"(ARRAY[abc])::text[]"', "'((ARRAY[''x''::character varying])::text[])'"):
+        assert _definition_tokens(quoted) == (quoted,)
 
 
 @pytest.fixture
@@ -104,6 +118,73 @@ def test_schema_and_migration_changes_are_detected(databases, change):
     result = compare_database_restore(*databases)
     assert result['status'] == 'mismatch'
     assert result['tables'][name]['status'] == 'mismatch'
+
+
+@requires_postgres
+@pytest.mark.parametrize('change', [
+    'foreign_key', 'foreign_key_action', 'unique', 'check', 'check_validation',
+    'deferrability', 'index', 'index_predicate', 'index_expression', 'index_include',
+])
+def test_constraints_and_indexes_cannot_be_lost_with_identical_rows(databases, change):
+    # DDL only; row bytes/counts stay identical. A count/content-only comparison
+    # would incorrectly accept every one of these incomplete restores.
+    baseline = {
+        'foreign_key': 'ALTER TABLE videos ADD CONSTRAINT probe_fk FOREIGN KEY (user_id) REFERENCES users(id)',
+        'foreign_key_action': 'ALTER TABLE videos ADD CONSTRAINT probe_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE',
+        'unique': 'ALTER TABLE users ADD CONSTRAINT probe_unique UNIQUE (email)',
+        'check': "ALTER TABLE users ADD CONSTRAINT probe_check CHECK (email <> 'private-schema-literal')",
+        'check_validation': 'ALTER TABLE users ADD CONSTRAINT probe_check CHECK (email IS NOT NULL) NOT VALID',
+        'deferrability': 'ALTER TABLE users ADD CONSTRAINT probe_unique UNIQUE (email) DEFERRABLE INITIALLY DEFERRED',
+        'index': 'CREATE INDEX probe_index ON users (email)',
+        'index_predicate': 'CREATE INDEX probe_index ON users (email) WHERE email IS NOT NULL',
+        'index_expression': 'CREATE INDEX probe_index ON users (lower(email))',
+        'index_include': 'CREATE INDEX probe_index ON users (email) INCLUDE (password_hash)',
+    }[change]
+    for engine in databases:
+        with engine.begin() as db:
+            db.execute(text(baseline))
+    assert compare_database_restore(*databases)['status'] == 'matched'
+    with databases[1].begin() as db:
+        if change.startswith('foreign_key'):
+            db.execute(text('ALTER TABLE videos DROP CONSTRAINT probe_fk'))
+            if change == 'foreign_key_action':
+                db.execute(text('ALTER TABLE videos ADD CONSTRAINT probe_fk FOREIGN KEY (user_id) REFERENCES users(id)'))
+        elif change == 'check_validation':
+            db.execute(text('ALTER TABLE users VALIDATE CONSTRAINT probe_check'))
+        elif change in ('check', 'unique', 'deferrability'):
+            name = 'probe_check' if change == 'check' else 'probe_unique'
+            db.execute(text(f'ALTER TABLE users DROP CONSTRAINT {name}'))
+            if change == 'deferrability':
+                db.execute(text('ALTER TABLE users ADD CONSTRAINT probe_unique UNIQUE (email)'))
+        else:
+            db.execute(text('DROP INDEX probe_index'))
+            if change != 'index':
+                db.execute(text('CREATE INDEX probe_index ON users (email)'))
+    report = compare_database_restore(*databases)
+    assert report['status'] == 'mismatch'
+    table = 'videos' if change.startswith('foreign_key') else 'users'
+    assert report['tables'][table] == {'status': 'mismatch', 'reason': 'schema_difference'}
+    for private in ('probe_', 'private-schema-literal', 'REFERENCES', 'CREATE INDEX'):
+        assert private not in json.dumps(report)
+
+
+@requires_postgres
+@pytest.mark.parametrize('kind', ['check', 'index'])
+def test_server_deparsed_array_cast_survives_restore_reparse(databases, kind):
+    predicate = "email = ANY (ARRAY['restore-private@example.com', 'other']::varchar[]::text[])"
+    source, restored = databases
+    with source.begin() as db:
+        if kind == 'check':
+            db.execute(text(f'ALTER TABLE users ADD CONSTRAINT probe_roundtrip CHECK ({predicate})'))
+            definition = db.scalar(text("SELECT pg_get_constraintdef(oid,false) FROM pg_constraint WHERE conname='probe_roundtrip'"))
+        else:
+            db.execute(text(f'CREATE INDEX probe_roundtrip ON users (email) WHERE {predicate}'))
+            definition = db.scalar(text("SELECT pg_get_indexdef('probe_roundtrip'::regclass)"))
+    # pg_dump sends this SQL representation to pg_restore. Reparse using the
+    # server rather than hand-selecting an equivalent expected expression.
+    with restored.begin() as db:
+        db.execute(text(f'ALTER TABLE users ADD CONSTRAINT probe_roundtrip {definition}' if kind == 'check' else definition))
+    assert compare_database_restore(*databases)['status'] == 'matched'
 
 
 @requires_postgres
