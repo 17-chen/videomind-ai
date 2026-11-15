@@ -1,7 +1,7 @@
 from pathlib import Path
 from functools import lru_cache
 
-from openai import OpenAI
+from openai import OpenAI, AuthenticationError, RateLimitError, APITimeoutError, APIConnectionError
 
 from app.core.config import settings
 from app.services.storage_quota import artifact_directory
@@ -23,19 +23,27 @@ def transcribe_audio(audio_path: str, video_id: str, api_key: str | None = None)
 
     input_path = Path(audio_path)
     if not input_path.exists():
-        raise VideoProcessingError(f"{t('audio_file_missing')}: {audio_path}")
-
-    client = OpenAI(api_key=api_key)
+        raise VideoProcessingError(t("audio_file_missing"))
 
     try:
+        client = OpenAI(api_key=api_key)
         with input_path.open("rb") as audio_file:
             transcript = client.audio.transcriptions.create(
                 model=settings.openai_whisper_model,
                 file=audio_file,
                 response_format="text",
             )
+    except AuthenticationError as exc:
+        raise VideoProcessingError(t("whisper_auth_failed")) from exc
+    except RateLimitError as exc:
+        raise VideoProcessingError(t("whisper_rate_limited")) from exc
+    except APITimeoutError as exc:
+        raise VideoProcessingError(t("whisper_timeout")) from exc
+    except APIConnectionError as exc:
+        raise VideoProcessingError(t("whisper_connection_failed")) from exc
     except Exception as exc:
-        raise VideoProcessingError(f"{t('whisper_failed')}: {exc}") from exc
+        # SDK errors may include provider response bodies and credentials.
+        raise VideoProcessingError(t("whisper_failed")) from exc
 
     content = str(transcript).strip()
     if not content:
@@ -63,7 +71,7 @@ def _transcribe_locally(audio_path: str, video_id: str) -> TranscriptResult:
     ensure_local_asr_available()
     input_path = Path(audio_path)
     if not input_path.is_file():
-        raise VideoProcessingError(f"{t('audio_file_missing')}: {audio_path}")
+        raise VideoProcessingError(t("audio_file_missing"))
     try:
         model = _local_model(
             settings.local_whisper_model,

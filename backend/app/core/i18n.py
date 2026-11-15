@@ -16,6 +16,7 @@ ZH_CN_MESSAGES: dict[str, str] = {
     "chroma_unavailable": "ChromaDB 暂不可用，请确认向量数据库服务已经启动",
     "yt_dlp_missing": "yt-dlp 未安装，无法下载视频",
     "video_download_failed": "视频下载失败",
+    "video_cookie_unavailable": "视频下载 Cookie 配置不可用，请联系管理员检查",
     "video_output_missing": "视频下载已结束，但没有找到输出文件",
     "ffmpeg_missing": "ffmpeg 未安装或不在 PATH 中",
     "video_file_missing": "视频文件不存在",
@@ -26,6 +27,10 @@ ZH_CN_MESSAGES: dict[str, str] = {
     "openai_key_required": "需要配置 OPENAI_API_KEY 才能使用 OpenAI Whisper 转写",
     "audio_file_missing": "音频文件不存在",
     "whisper_failed": "Whisper 转写失败",
+    "whisper_auth_failed": "转写服务认证失败，请检查本人的 API Key",
+    "whisper_rate_limited": "转写服务额度不足或请求过于频繁，请检查服务商后手动重试",
+    "whisper_timeout": "转写服务请求超时，请检查服务商后手动重试",
+    "whisper_connection_failed": "无法连接转写服务，请检查网络后重试",
     "whisper_empty": "Whisper 返回了空转写结果",
 }
 

@@ -46,7 +46,7 @@ def extract_audio(video_path: str, video_id: str) -> ExtractedAudio:
 
     input_path = Path(video_path)
     if not input_path.exists():
-        raise VideoProcessingError(f"{t('video_file_missing')}: {video_path}")
+        raise VideoProcessingError(t("video_file_missing"))
 
     output_dir = artifact_directory("audio")
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -80,7 +80,7 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
     if settings.video_cookie_file:
         cookie_file = Path(settings.video_cookie_file)
         if not cookie_file.is_file():
-            raise VideoProcessingError(f"Cookie 文件不存在：{cookie_file}")
+            raise VideoProcessingError(t("video_cookie_unavailable"))
         options["cookiefile"] = str(cookie_file)
     if settings.video_http_proxy:
         options["proxy"] = settings.video_http_proxy
@@ -105,7 +105,9 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
                 "Bilibili 拒绝了当前下载请求（HTTP 412）。请导出 Netscape 格式登录 Cookie，"
                 "保存到 storage/cookies/bilibili.txt，并设置 VIDEO_COOKIE_FILE=/app/storage/cookies/bilibili.txt。"
             ) from exc
-        raise VideoProcessingError(f"{t('video_download_failed')}: {message}") from exc
+        # yt-dlp errors can contain signed URLs, proxy credentials or local
+        # cookie paths. Only fixed application messages may be persisted.
+        raise VideoProcessingError(t("video_download_failed")) from exc
 
     file_path = _resolve_downloaded_file(prepared_path, output_dir, video_id)
 

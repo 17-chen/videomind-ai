@@ -1,5 +1,10 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+import sys
 
+import httpx
+from openai import AuthenticationError
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -350,3 +355,110 @@ def test_run_retry_after_vector_failure_reuses_transcript_and_summary(task_api, 
         assert video.embedding.vector_id == f"video:{video_id}"
         assert video.status == "completed"
     assert calls == {"transcription": 1, "analysis": 1, "embedding": 2}
+
+
+@pytest.mark.parametrize('failed_stage', ['download', 'cloud_asr'])
+def test_media_error_is_safe_in_database_api_and_logs_and_can_be_retried(task_api, monkeypatch, failed_stage):
+    from app.core.i18n import t
+    from app.services.storage_quota import artifact_directory
+    from app.services.video_processing import pipeline, transcriber
+    from app.services.video_processing.types import ExtractedAudio
+
+    client, engine = task_api
+    video_id = create_video(client)
+    private = 'synthetic-secret https://user:password@example.com/?signature=private-signature /private/cookies'
+    state = {'fail': True, 'asr_calls': 0}
+    monkeypatch.setattr(settings, 'asr_provider', 'openai')
+    monkeypatch.setattr(settings, 'file_storage_backend', 'local')
+
+    class FakeYDL:
+        def __init__(self, options):
+            self.path = Path(options['outtmpl'].replace('%(ext)s', 'mp4'))
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def extract_info(self, *args, **kwargs):
+            self.path.write_bytes(b'synthetic downloaded media')
+            if failed_stage == 'download' and state['fail']:
+                raise RuntimeError(private)
+            return {}
+        def prepare_filename(self, info):
+            return str(self.path)
+
+    monkeypatch.setitem(sys.modules, 'yt_dlp', SimpleNamespace(YoutubeDL=FakeYDL))
+    monkeypatch.setattr(pipeline, 'find_downloaded_subtitles', lambda **_: None)
+    def personal_key(user):
+        assert user.email == 'alice@example.com'
+        return 'synthetic-personal-key'
+    monkeypatch.setattr(pipeline, 'resolve_asr_key', personal_key)
+    def extract(video_path, video_id):
+        output = artifact_directory('audio') / f'{video_id}.mp3'
+        output.write_bytes(b'synthetic audio')
+        return ExtractedAudio(video_id=video_id, file_path=str(output))
+    monkeypatch.setattr(pipeline, 'extract_audio', extract)
+    def transcribe(**kwargs):
+        state['asr_calls'] += 1
+        if state['fail']:
+            response = httpx.Response(401, request=httpx.Request('POST', 'https://example.com/'))
+            raise AuthenticationError(private, response=response, body={'private': private})
+        return 'Synthetic retry transcript'
+    def asr_client(**kwargs):
+        assert kwargs == {'api_key': 'synthetic-personal-key'}
+        return SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=transcribe)))
+    monkeypatch.setattr(transcriber, 'OpenAI', asr_client)
+
+    media_root = Path(settings.video_storage_dir)
+    media_root.mkdir()
+    old_media = media_root / f'{video_id}.mp4'
+    old_media.write_bytes(b'old media')
+    transcript_root = Path(settings.transcript_storage_dir)
+    transcript_root.mkdir()
+    old_transcript = transcript_root / f'{video_id}.txt'
+    old_transcript.write_bytes(b'old transcript')
+    unrelated = media_root / '.staging-unrelated'
+    unrelated.mkdir()
+    (unrelated / 'keep').write_bytes(b'keep')
+    messages = []
+    sink = logger.add(lambda message: messages.append(str(message)), format='{message}')
+    try:
+        started = client.post(f'/api/v1/videos/{video_id}/process', headers=auth('alice'))
+        assert started.status_code == 202
+        task_id = started.json()['task_id']
+        with Session(engine) as db:
+            assert video_tasks.claim_next_task(db, 'worker-a').id == task_id
+            video_tasks.execute_claimed_task(db, task_id, 'worker-a')
+        safe_error = t('video_download_failed' if failed_stage == 'download' else 'whisper_auth_failed')
+        with Session(engine) as db:
+            assert db.get(VideoTask, task_id).error == safe_error
+            assert db.get(Video, video_id).processing_error == safe_error
+            assert db.get(Video, video_id).transcript is None
+        task_response = client.get(f'/api/v1/videos/{video_id}/task', headers=auth('alice'))
+        video_response = client.get(f'/api/v1/videos/{video_id}', headers=auth('alice'))
+        assert task_response.json()['status'] == 'failed'
+        assert task_response.json()['error'] == safe_error
+        assert video_response.json()['processing_error'] == safe_error
+        for marker in ('synthetic-secret', 'private-signature', 'user:password', '/private/cookies'):
+            assert marker not in task_response.text + video_response.text + ''.join(messages)
+        assert old_transcript.read_bytes() == b'old transcript'
+        if failed_stage == 'download':
+            assert old_media.read_bytes() == b'old media'
+            assert state['asr_calls'] == 0
+        for kind in ('video', 'audio', 'transcript'):
+            assert set(Path(getattr(settings, f'{kind}_storage_dir')).glob('.staging-*')) <= {unrelated}
+        assert (unrelated / 'keep').read_bytes() == b'keep'
+
+        state['fail'] = False
+        retry = client.post(f'/api/v1/videos/{video_id}/process', headers=auth('alice'))
+        assert retry.status_code == 202
+        with Session(engine) as db:
+            assert video_tasks.claim_next_task(db, 'worker-b').id == retry.json()['task_id']
+            video_tasks.execute_claimed_task(db, retry.json()['task_id'], 'worker-b')
+            assert db.get(VideoTask, retry.json()['task_id']).status == 'succeeded'
+            video = db.get(Video, video_id)
+            assert video.processing_error is None
+            assert video.transcript.content == 'Synthetic retry transcript'
+        assert state['asr_calls'] == (1 if failed_stage == 'download' else 2)
+        assert (unrelated / 'keep').read_bytes() == b'keep'
+    finally:
+        logger.remove(sink)
