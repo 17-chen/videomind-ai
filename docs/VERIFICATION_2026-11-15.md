@@ -13,6 +13,8 @@
 
 ## 验证
 
+功能 `09dbbea` 已同步 GitHub，[CI 43712986354](https://github.com/17-chen/videomind-ai/actions/runs/43712986354) 前后端及固定检索检查全部通过。
+
 最终源码 **429项后端测试**及 `ruff check app tests scripts` 通过。使用无外网、无业务卷和真实凭据的一次性 PostgreSQL/pgvector 16 容器，三组 opt-in 测试启用；仅已有 LangGraph 弃用警告。
 
 新增19项回归：
