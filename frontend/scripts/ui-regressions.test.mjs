@@ -192,6 +192,7 @@ test('chat renders returned citations as owner detail links and sends the chosen
     '@/lib/language': { useTranslator: () => value => value, useLanguage: () => ({ language: 'zh' }) },
     '@/components/ui': { Button: 'button', SecondaryButton: 'button', Panel: 'section', Textarea: 'textarea' },
     '@/lib/api': { chatWithVideos: async payload => { calls.push(payload); return { answer: 'Synthetic grounded answer', sources: [source] }; } },
+    '@/lib/chat-citations': load('lib/chat-citations.ts'),
   });
   nodes(ChatClient()).find(node => node.type === 'textarea').props.onChange({ target: { value: 'Synthetic question' } });
   h.reset();
@@ -204,4 +205,58 @@ test('chat renders returned citations as owner detail links and sends the chosen
   const link = nodes(tree).find(node => node.type === 'a');
   assert.equal(link.props.href, '/videos/synthetic-owner-video');
   assert.match(text(link), /\[1\]\s+Synthetic source/);
+});
+
+test('numbered references preserve text and link only this response\'s available sources', () => {
+  const { splitAnswerCitations } = load('lib/chat-citations.ts');
+  for (const [answer, count, expected] of [
+    ['One[1][2], again[1]. Unknown[3][0][01][99999999999999999999999]', 2, '0,1,0'],
+    ['No evidence [1]', 0, ''],
+    ['Visible[1] `array[1]` [2]\n```js\n[2]\n````\n[1]', 2, '0,1,0'],
+    ['~~~text\n[1]\n~~~\n[2]', 2, '1'],
+    ['``code`[1]`` [2]', 2, '1'],
+    ['Unclosed `[1] and [2]', 2, ''],
+    [String.raw`Escaped \[1], actual \\[2]`, 2, '1'],
+    ['[1](https://example.com/(path[2])) plain[2]', 2, '1'],
+    ['[1](https://example.com/unclosed[2]', 2, ''],
+  ]) {
+    const parts = splitAnswerCitations(answer, count);
+    assert.equal(parts.map(part => part.text).join(''), answer);
+    assert.equal(parts.filter(part => part.sourceIndex !== undefined).map(part => part.sourceIndex).join(','), expected);
+  }
+});
+
+test('inline citations navigate to matching owner videos and update with the next answer', async () => {
+  const h = hooks();
+  const first = { video_id: 'owner-a', title: 'Evidence A', snippet: 'Passage A', category: null, distance: null };
+  const second = { ...first, video_id: 'owner-b', title: 'Evidence B' };
+  const results = [
+    { answer: 'Claims[2][1][2]. Unknown[9]. Code `[1]`. [1](https://example.com/foreign)', sources: [first, second] },
+    { answer: 'New answer[1][2]', sources: [second] },
+  ];
+  const { ChatClient } = load('components/chat-client.tsx', {
+    react: h.react, 'react/jsx-runtime': jsx,
+    '@/lib/language': { useTranslator: () => value => value, useLanguage: () => ({ language: 'zh' }) },
+    '@/components/ui': { Button: 'button', SecondaryButton: 'button', Panel: 'section', Textarea: 'textarea' },
+    '@/lib/chat-citations': load('lib/chat-citations.ts'),
+    '@/lib/api': { chatWithVideos: async () => results.shift() },
+  });
+  async function submit() {
+    h.reset();
+    await nodes(ChatClient()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+    h.reset();
+    return ChatClient();
+  }
+  let tree = await submit();
+  let citations = nodes(tree).filter(node => node.type === 'a' && node.props['aria-label']);
+  assert.equal(citations.map(node => node.props.href).join(','), '/videos/owner-b,/videos/owner-a,/videos/owner-b');
+  assert.equal(citations[0].props.title, 'Evidence B');
+  assert.equal(citations[0].props['aria-label'], '[2] Evidence B');
+  assert.match(text(tree), /Unknown\[9\]/);
+  assert.ok(nodes(tree).filter(node => node.type === 'a').every(node => node.props.href.startsWith('/videos/')));
+  tree = await submit();
+  citations = nodes(tree).filter(node => node.type === 'a' && node.props['aria-label']);
+  assert.equal(citations.length, 1);
+  assert.equal(citations[0].props.href, '/videos/owner-b');
+  assert.match(text(tree), /\[2\]/); // Missing source never reuses the preceding answer's source.
 });

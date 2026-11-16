@@ -6,6 +6,7 @@ import { Bot, Loader2, Send, SlidersHorizontal } from "lucide-react";
 import { Button, Panel, SecondaryButton, Textarea } from "@/components/ui";
 import { chatWithVideos } from "@/lib/api";
 import type { ChatResponse } from "@/lib/types";
+import { splitAnswerCitations } from "@/lib/chat-citations";
 
 const examples = ["我之前看过哪些关于人工智能的视频？", "总结我收藏的视频里面关于创业的共同观点", "有哪些视频提到了 AI Agent 的商业化？"];
 
@@ -83,14 +84,24 @@ export function ChatClient() {
               </div>
               <p className="text-xl font-black">{tx("Memory answer")}</p>
             </div>
-            <div className="whitespace-pre-wrap text-sm leading-8">{result.answer}</div>
+            <div className="whitespace-pre-wrap text-sm leading-8">
+              {splitAnswerCitations(result.answer, result.sources.length).map((part, index) => part.sourceIndex === undefined ? part.text : (
+                <a
+                  key={index}
+                  href={`/videos/${encodeURIComponent(result.sources[part.sourceIndex].video_id)}`}
+                  title={result.sources[part.sourceIndex].title}
+                  aria-label={`${part.text} ${result.sources[part.sourceIndex].title}`}
+                  className="rounded-sm font-semibold text-accent underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >{part.text}</a>
+              ))}
+            </div>
           </Panel>
           {result.sources.length ? (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-muted-foreground">{tx("引用视频记忆")}</p>
               {result.sources.map((source, index) => (
                 <Panel key={source.video_id} className="p-5">
-                  <a href={`/videos/${source.video_id}`} className="text-lg font-black hover:text-accent">
+                  <a href={`/videos/${encodeURIComponent(source.video_id)}`} className="text-lg font-black hover:text-accent">
                     {`[${index + 1}] ${source.title}`}
                   </a>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{source.snippet}</p>
