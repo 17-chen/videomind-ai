@@ -10,8 +10,10 @@ main `d85a74e` fetch 后与 origin/main 一致。按当前交接继续可独立�
 
 ## 验证证据
 
+功能 `7aa6abc` 已同步 GitHub，[CI 43835049597](https://github.com/17-chen/videomind-ai/actions/runs/43835049597) 前后端及固定检索检查全部通过。
+
 - **14项前端回归通过**（原12项加2项）：文本/代码/越界编号保留，连续与重复引用对应正确来源；组件验证内部href、来源标题/无障碍名称、不生成模型URL链接，以及第二次回答不复用上次的编号映射。使用合成回答、模拟 API/React 钩子，不是实际浏览器点击或真实模型质量验收。
-- 临时副本 `/tmp/videomind-citations-0qj61jbg` 使用仓库锁文件执行 npm ci，Node 24.16.0 / Next.js 16.4.3；最终 `npm run build`、`npm run typecheck`、`npm run lint` 全部通过。未复制 .env、仓库 node_modules 或旧 .next；未覆盖运行开发构建目录。首次在本机仓库直接运行因缺 TypeScript 依赖未完成，随后在临时副本完整通过。
+- 临时副本 `/tmp/videomind-citations-0qj61jbg` 使用仓库锁文件执行 npm ci，Node 24.16.0 / Next.js 16.4.3；最终 `npm run build`、`npm run typecheck`、`npm run lint` 全部通过。未复制 .env、仓库 node_modules 或旧 .next；未覆盖运行开发构建目录。首次在本机仓库直接运行因缺 TypeScript 依赖未完成，随后在临时副本完整通过；完成后仅移除本轮创建的该临时副本。
 - 本轮后端未修改，未在本机重跑后端测试；远端 CI 仍覆盖后端 PostgreSQL、Ruff、检索和前端检查。不会用前端测试代替真实 ASR/BGE/Supabase 或服务商验收。
 
 ## 预览与保护
