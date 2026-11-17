@@ -10,9 +10,11 @@ main `3b92a21` fetch 后与 origin/main 一致。按当前交接继续无需账�
 
 ## 验证证据
 
+功能 `f4d80e9` 已同步 GitHub，[CI 44001063110](https://github.com/17-chen/videomind-ai/actions/runs/44001063110) 前后端及固定检索检查全部通过。
+
 - 前端共 **19项回归通过**（新增5项）：同帧和重新渲染期间重复提交只调用一次模拟 API；草稿/检索数量编辑不改变已提交问题和请求；失败可显式重试并清除错误；卸载后迟到成功/失败不更新状态，也不再发出请求；纯空白即使直接提交也不调用 API。旧引用映射与任务自动轮询回归继续通过。
 - 测试加载器增加 ref 模拟，并共享 Error 构造函数，避免模拟 API 与 vm 组件跨执行域导致 instanceof 误判。使用合成数据、模拟 API/React 钩子，不是浏览器或真实模型验收。
-- `/tmp/videomind-chat-submit-vdo1jovn` 独立副本 npm ci，Node 24.16.0 / Next.js 16.4.3；最终 `npm run build`、`npm run typecheck`、`npm run lint` 通过。未复制 .env、旧 .next 或仓库 node_modules，不覆盖开发构建目录。后端源码未改，本机不重跑后端；GitHub CI仍检查后端 PostgreSQL/Ruff/检索和前端。
+- `/tmp/videomind-chat-submit-vdo1jovn` 独立副本 npm ci，Node 24.16.0 / Next.js 16.4.3；最终 `npm run build`、`npm run typecheck`、`npm run lint` 通过。未复制 .env、旧 .next 或仓库 node_modules，不覆盖开发构建目录。测试后仅移除本轮创建的该临时副本。后端源码未改，本机不重跑后端；GitHub CI仍检查后端 PostgreSQL/Ruff/检索和前端。
 
 ## 预览与边界
 
