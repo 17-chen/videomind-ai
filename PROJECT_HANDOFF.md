@@ -2,6 +2,8 @@
 
 ## 当前交接：2026-11-17（优先于下方历史记录）
 
+2026-11-17 后续预览恢复：用户报告注册页打不开，已恢复现有 Colima 4GB；云前端3001 /auth与API8002 readiness均200。恢复前临时拦住Worker入口，随后明确停止videomind-preview-worker与videomind-worker，再逐字节恢复原源码；未领取/重跑任务。队列只读queued/running/failed/expired均0、succeeded=1。当前仅注册/登录所需云前端/API运行，Worker保持停止，旧3000/8001演示未恢复。
+
 2026-11-17：功能 `f4d80e9` 已同步 GitHub，[CI 44001063110](https://github.com/17-chen/videomind-ai/actions/runs/44001063110) 前后端及固定检索检查全部通过。R2/R8 问答表单增加同步在途保护，同一挂载实例只允许一个未完成请求；空白问题不请求、失败可显式重试、卸载后忽略迟到结果。回答标注实际提交问题，草稿可继续编辑。19项前端回归及临时副本build/typecheck/lint通过，API为模拟；预览两文件经基线核对同步，Colima未运行，未调用模型/重跑视频。跨标签页/服务端幂等、真实双账号/引用/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-17.md)。
 
 2026-11-16：功能 `7aa6abc` 已同步 GitHub，[CI 43835049597](https://github.com/17-chen/videomind-ai/actions/runs/43835049597) 前后端及固定检索检查全部通过。R2/R7 问答正文有效编号可点击对应本人视频，来源按本次回答重新映射；未知编号、代码片段和编号Markdown链接保留原文，不将模型给出的URL变为链接。14项前端回归及临时副本build/typecheck/lint通过。预览私有副本两文件经基线核对后同步；Colima未运行，本轮未启动服务、调用模型或重跑视频。真实引用质量/双账号/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-16.md)。
@@ -26,7 +28,7 @@
 - **当前首要待确认：**用户追问状态应自动更新。代码处理期约每 3 秒读取本人视频/任务，终态停止轮询并 router.refresh 更新详情；旧页面需刷新一次加载新代码。尚未独立验证“从新任务入队直到笔记出现，全程不手动刷新”的完整浏览器过程。新聊天先复核这个体验，不要求用户重做已完成视频，也不自动重跑收费阶段。
 - **交接时只读复核（2026-11-15）：**空闲队列后重载云API/Worker；3001 /auth 与 8002 readiness均200、匿名videos=401，未重跑模型任务。
 - **预览拓扑（上次运行）：**云预览前端 `http://localhost:3001`、API `http://localhost:8002/api/v1`；容器 videomind-preview-frontend/api/worker。原演示仍 3000/8001，local/Chroma，用户曾误打开旧页面。云端为 Supabase Auth/PostgreSQL 17/私有 Storage/pgvector，embedding_provider 仍 local_hash，并非真实 BGE 云检索验收。Supabase Site URL=3001。
-- **本轮运行状态（2026-11-17）：**Colima Docker daemon仍不可连接，未启动旧容器；当前健康未复核。私有frontend-preview的components/chat-client.tsx与lib/i18n.ts经基线核对后同步；上轮lib/chat-citations.ts保留，未复制.env/.next。恢复服务前先核对队列和自动重试边界，避免重复计费。
+- **本轮运行状态（2026-11-17后续恢复）：**Colima已恢复，云frontend/api运行，3001/auth与8002 readiness均200；云及旧演示Worker均明确停止，旧3000/8001未恢复。queued/running/failed/expired均0、succeeded=1，用户可注册第二账号。私有前端源码已同步；后续需要处理视频时再显式恢复云Worker，禁止启动旧归档Worker。
 - **转写：**云 API/Worker 使用已有 videomind-ai-local-ai-probe 镜像和当前源码，本地 Whisper base、CPU/int8，模型离线加载；用户的 DeepSeek 用于笔记/问答，不用 OpenAI 转写 Key。原模型缓存读取超时未覆盖，独立新缓存见私有目录 asr-model-cache。成功任务约 111 秒是整任务耗时，不是独立 ASR 基准；未宣称计算提速。
 - **本机私有配置：**`~/Library/Application Support/VideoMind AI/` 中 `.env.preview.local`、frontend-public.json、launch-backend.py、launch-frontend.cjs、frontend-preview、证书、状态文件、模型与备份；不回显、不提交真实配置。3001 前端来自私有源码副本，后续改前端须将相关源码同步到该副本并验证，单改仓库不会自动更新 3001。不要全量覆盖或带入 .env/旧 .next。
 - **资源/回退：**用户已授权 Colima 扩容至 4GB，Docker socket `unix:///Users/chenxin/.colima/default/docker.sock`。旧云 API/Worker 保存在带 `-before-local-asr-20261108` 后缀的停止容器，禁止与新 Worker 同时启动。重启前先核对活动队列；不删除数据卷、不重建加密主密钥。

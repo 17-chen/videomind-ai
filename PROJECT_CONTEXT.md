@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-17 后续预览恢复：用户报告注册页打不开，已恢复现有 Colima 4GB；云前端3001 /auth与API8002 readiness均200。恢复前临时拦住Worker入口，随后明确停止videomind-preview-worker与videomind-worker，再逐字节恢复原源码；未领取/重跑任务。队列只读queued/running/failed/expired均0、succeeded=1。当前仅注册/登录所需云前端/API运行，Worker保持停止，旧3000/8001演示未恢复。
+
 2026-11-17：功能 `f4d80e9` 已同步 GitHub，[CI 44001063110](https://github.com/17-chen/videomind-ai/actions/runs/44001063110) 前后端及固定检索检查全部通过。R2/R8 问答表单增加同步在途保护，同一挂载实例只允许一个未完成请求；空白问题不请求、失败可显式重试、卸载后忽略迟到结果。回答标注实际提交问题，草稿可继续编辑。19项前端回归及临时副本build/typecheck/lint通过，API为模拟；预览两文件经基线核对同步，Colima未运行，未调用模型/重跑视频。跨标签页/服务端幂等、真实双账号/引用/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-17.md)。
 
 2026-11-16：功能 `7aa6abc` 已同步 GitHub，[CI 43835049597](https://github.com/17-chen/videomind-ai/actions/runs/43835049597) 前后端及固定检索检查全部通过。R2/R7 问答正文有效编号可点击对应本人视频，来源按本次回答重新映射；未知编号、代码片段和编号Markdown链接保留原文，不将模型给出的URL变为链接。14项前端回归及临时副本build/typecheck/lint通过。预览私有副本两文件经基线核对后同步；Colima未运行，本轮未启动服务、调用模型或重跑视频。真实引用质量/双账号/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-16.md)。
