@@ -1,6 +1,8 @@
 # VideoMind AI 完整交接文档
 
-## 当前交接：2026-11-16（优先于下方历史记录）
+## 当前交接：2026-11-17（优先于下方历史记录）
+
+2026-11-17：R2/R8 问答表单增加同步在途保护，同一挂载实例只允许一个未完成请求；空白问题不请求、失败可显式重试、卸载后忽略迟到结果。回答标注实际提交问题，草稿可继续编辑。19项前端回归及临时副本build/typecheck/lint通过，API为模拟；预览两文件经基线核对同步，Colima未运行，未调用模型/重跑视频。跨标签页/服务端幂等、真实双账号/引用/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-17.md)。
 
 2026-11-16：功能 `7aa6abc` 已同步 GitHub，[CI 43835049597](https://github.com/17-chen/videomind-ai/actions/runs/43835049597) 前后端及固定检索检查全部通过。R2/R7 问答正文有效编号可点击对应本人视频，来源按本次回答重新映射；未知编号、代码片段和编号Markdown链接保留原文，不将模型给出的URL变为链接。14项前端回归及临时副本build/typecheck/lint通过。预览私有副本两文件经基线核对后同步；Colima未运行，本轮未启动服务、调用模型或重跑视频。真实引用质量/双账号/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-16.md)。
 
@@ -19,17 +21,17 @@
 2026-11-08 验收推进：修复入队响应及任务/视频快照错位时按钮提前解锁，补逐阶段轮询/错误重试/卸载与问答引用渲染回归。12 项前端测试、隔离 build/typecheck/lint；一次性 PostgreSQL 下 359 项后端测试/Ruff 通过，已同步 3001 单个组件。真实页面可见已有笔记，云队列活动/失败/过期均 0；现有 1 条用户密文以当前主密钥校验 verified，不等于备份恢复。未重复处理视频或调用模型；第二账号尚未准备，真实全过程自动更新、问答引用质量、双账号和隔离恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-08_ACCEPTANCE.md)。
 
 - **当前目标：**完成真实账号/本人模型体验验收，再准备受保护部署。本轮继续验收；第二真实账号尚未准备，先完成可独立验证部分。
-- **代码与检查：**功能7aa6abc已同步main，CI43835049597前后端及固定检索检查通过；本轮问答引用映射14项前端回归、临时副本生产build/typecheck/lint通过，后端源码未改；上轮09dbbea及文档d85a74e已同步，CI43712986354通过（后端429项）。本轮未启动/执行真实任务。
+- **代码与检查：**本轮19项前端回归与临时副本build/typecheck/lint通过，后端源码未改。上轮7aa6abc及文档3b92a21已同步，CI43835049597通过（后端429项）。本轮未启动/执行真实任务。
 - **人工确认：**用户完成注册/邮箱确认并登录；登录跳转和任务完成状态修复后明确回复“两项都正常”，随后说“现在生成内容了”。没有检查生成正文或付费服务商账单，不据此认定问答/引用、整条模型链和双用户已验收。
 - **当前首要待确认：**用户追问状态应自动更新。代码处理期约每 3 秒读取本人视频/任务，终态停止轮询并 router.refresh 更新详情；旧页面需刷新一次加载新代码。尚未独立验证“从新任务入队直到笔记出现，全程不手动刷新”的完整浏览器过程。新聊天先复核这个体验，不要求用户重做已完成视频，也不自动重跑收费阶段。
 - **交接时只读复核（2026-11-15）：**空闲队列后重载云API/Worker；3001 /auth 与 8002 readiness均200、匿名videos=401，未重跑模型任务。
 - **预览拓扑（上次运行）：**云预览前端 `http://localhost:3001`、API `http://localhost:8002/api/v1`；容器 videomind-preview-frontend/api/worker。原演示仍 3000/8001，local/Chroma，用户曾误打开旧页面。云端为 Supabase Auth/PostgreSQL 17/私有 Storage/pgvector，embedding_provider 仍 local_hash，并非真实 BGE 云检索验收。Supabase Site URL=3001。
-- **本轮运行状态（2026-11-16）：**Colima Docker daemon不可连接，未启动任何旧容器；当前健康未复核。私有frontend-preview的components/chat-client.tsx与lib/chat-citations.ts已与本轮源码同步，未复制.env/.next。恢复服务前先核对队列和自动重试边界，避免重复计费。
+- **本轮运行状态（2026-11-17）：**Colima Docker daemon仍不可连接，未启动旧容器；当前健康未复核。私有frontend-preview的components/chat-client.tsx与lib/i18n.ts经基线核对后同步；上轮lib/chat-citations.ts保留，未复制.env/.next。恢复服务前先核对队列和自动重试边界，避免重复计费。
 - **转写：**云 API/Worker 使用已有 videomind-ai-local-ai-probe 镜像和当前源码，本地 Whisper base、CPU/int8，模型离线加载；用户的 DeepSeek 用于笔记/问答，不用 OpenAI 转写 Key。原模型缓存读取超时未覆盖，独立新缓存见私有目录 asr-model-cache。成功任务约 111 秒是整任务耗时，不是独立 ASR 基准；未宣称计算提速。
 - **本机私有配置：**`~/Library/Application Support/VideoMind AI/` 中 `.env.preview.local`、frontend-public.json、launch-backend.py、launch-frontend.cjs、frontend-preview、证书、状态文件、模型与备份；不回显、不提交真实配置。3001 前端来自私有源码副本，后续改前端须将相关源码同步到该副本并验证，单改仓库不会自动更新 3001。不要全量覆盖或带入 .env/旧 .next。
 - **资源/回退：**用户已授权 Colima 扩容至 4GB，Docker socket `unix:///Users/chenxin/.colima/default/docker.sock`。旧云 API/Worker 保存在带 `-before-local-asr-20261108` 后缀的停止容器，禁止与新 Worker 同时启动。重启前先核对活动队列；不删除数据卷、不重建加密主密钥。
 - **下一步顺序：**自动更新浏览器全程复核 → 当前账号真实笔记/问答引用与本人模型错误路径 → 第二真实账号数据/Key 隔离 → 删除/重启持久性及隔离恢复 → 受保护公网预发布。R6 旧文件迁移/pending 安全解决、R8 并发空间/统一限流与监控、R1 中文质量/真实性能仍未完成。
-- **保护现状：**原未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交、不清理。本轮修改问答引用链接/回归与文档；新聊天以实际 Git/运行检查为准，历史发布授权不替代新请求。
+- **保护现状：**原未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交、不清理。本轮修改问答提交保护/问题标注/回归与文档；新聊天以实际 Git/运行检查为准，历史发布授权不替代新请求。
 
 证据：[真实 Supabase 基础接入](docs/VERIFICATION_2026-11-08_SUPABASE.md)、[本地转写运行](docs/VERIFICATION_2026-11-08_LOCAL_ASR.md)、[登录/时间/终态 UI](docs/VERIFICATION_2026-11-08_UI.md)。
 

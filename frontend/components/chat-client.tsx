@@ -1,7 +1,7 @@
 "use client";
 
 import { useLanguage, useTranslator } from "@/lib/language";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, SlidersHorizontal } from "lucide-react";
 import { Button, Panel, SecondaryButton, Textarea } from "@/components/ui";
 import { chatWithVideos } from "@/lib/api";
@@ -17,18 +17,32 @@ export function ChatClient() {
   const [limit, setLimit] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<ChatResponse | null>(null);
+  const [result, setResult] = useState<(ChatResponse & { question: string }) | null>(null);
+  const pending = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   async function ask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submittedQuestion = question.trim();
+    if (!submittedQuestion || pending.current || !mounted.current) return;
+    // State-driven button disabling alone cannot guard two submissions before
+    // the next render. Keep one in-flight request per mounted form.
+    pending.current = true;
     setError("");
     setLoading(true);
     try {
-      setResult(await chatWithVideos({ question, limit, language }));
+      const response = await chatWithVideos({ question: submittedQuestion, limit, language });
+      if (mounted.current) setResult({ ...response, question: submittedQuestion });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("问答失败"));
+      if (mounted.current) setError(err instanceof Error ? err.message : tx("问答失败"));
     } finally {
-      setLoading(false);
+      pending.current = false;
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -84,6 +98,9 @@ export function ChatClient() {
               </div>
               <p className="text-xl font-black">{tx("Memory answer")}</p>
             </div>
+            <p className="mb-4 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+              {tx("回答的问题")}：{result.question}
+            </p>
             <div className="whitespace-pre-wrap text-sm leading-8">
               {splitAnswerCitations(result.answer, result.sources.length).map((part, index) => part.sourceIndex === undefined ? part.text : (
                 <a

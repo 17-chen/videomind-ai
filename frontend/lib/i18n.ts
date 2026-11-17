@@ -1,6 +1,7 @@
 export type Language = "zh" | "en";
 
 export const translations: Record<string, [string, string]> = {
+  "回答的问题": ["回答的问题", "Question answered"],
   "completed": ["已完成", "Completed"],
   "登录未建立会话，请重试。": ["登录未建立会话，请重试。", "No login session was created. Please try again."],
   "相同视频正在上传或等待核对，请稍后重试": ["相同视频正在上传或等待核对，请稍后重试", "This video is uploading or awaiting verification. Please try again later."],

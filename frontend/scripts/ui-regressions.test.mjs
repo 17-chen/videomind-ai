@@ -13,7 +13,7 @@ function load(file, mocks = {}, globals = {}) {
   }}).outputText;
   const exports = {};
   vm.runInNewContext(code, { exports, require: name => name in mocks ? mocks[name] : realRequire(name),
-    Intl, Date, setTimeout, clearTimeout, ...globals });
+    Intl, Date, Error, setTimeout, clearTimeout, ...globals });
   return exports;
 }
 const jsx = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
@@ -32,6 +32,7 @@ function hooks() {
   return { values, effects, reset: () => { index = 0; },
     react: {
       useState(initial) { const i = index++; if (!(i in values)) values[i] = initial; return [values[i], value => { values[i] = value; }]; },
+      useRef(initial) { const i = index++; if (!(i in values)) values[i] = { current: initial }; return values[i]; },
       useEffect(effect) { effects.push(effect); },
     },
   };
@@ -243,6 +244,8 @@ test('inline citations navigate to matching owner videos and update with the nex
   });
   async function submit() {
     h.reset();
+    nodes(ChatClient()).find(node => node.type === 'textarea').props.onChange({ target: { value: 'Synthetic question' } });
+    h.reset();
     await nodes(ChatClient()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
     h.reset();
     return ChatClient();
@@ -259,4 +262,87 @@ test('inline citations navigate to matching owner videos and update with the nex
   assert.equal(citations.length, 1);
   assert.equal(citations[0].props.href, '/videos/owner-b');
   assert.match(text(tree), /\[2\]/); // Missing source never reuses the preceding answer's source.
+});
+
+function chatHarness(api) {
+  const h = hooks();
+  const { ChatClient } = load('components/chat-client.tsx', {
+    react: h.react, 'react/jsx-runtime': jsx,
+    '@/lib/language': { useTranslator: () => value => value, useLanguage: () => ({ language: 'zh' }) },
+    '@/components/ui': { Button: 'button', SecondaryButton: 'button', Panel: 'section', Textarea: 'textarea' },
+    '@/lib/chat-citations': load('lib/chat-citations.ts'),
+    '@/lib/api': { chatWithVideos: api },
+  });
+  const render = () => { h.reset(); return ChatClient(); };
+  return { ...h, render,
+    change(value) { nodes(render()).find(node => node.type === 'textarea').props.onChange({ target: { value } }); },
+    submit() { return nodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); },
+  };
+}
+
+test('same-render duplicate submits send one request and response stays tied to the submitted question', async () => {
+  const calls = [];
+  let complete;
+  const h = chatHarness(payload => { calls.push(payload); return new Promise(resolve => { complete = resolve; }); });
+  h.change('  Original question\n');
+  const submit = nodes(h.render()).find(node => node.type === 'form').props.onSubmit;
+  const first = submit({ preventDefault() {} });
+  await submit({ preventDefault() {} }); // Same render, before loading state can disable anything.
+  assert.equal(calls.length, 1);
+  assert.equal(nodes(h.render()).find(node => node.props?.type === 'submit').props.disabled, true);
+  h.change('Draft follow-up');
+  nodes(h.render()).find(node => node.props?.type === 'range').props.onChange({ target: { value: '2' } });
+  await h.submit(); // Re-rendering must not release the request guard.
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].question, 'Original question');
+  assert.equal(calls[0].limit, 5);
+  complete({ answer: 'Synthetic answer', sources: [] });
+  await first;
+  const tree = h.render();
+  assert.match(text(tree), /回答的问题.*Original question/);
+  assert.equal(nodes(tree).find(node => node.type === 'textarea').props.value, 'Draft follow-up');
+  assert.equal(nodes(tree).find(node => node.props?.type === 'submit').props.disabled, false);
+});
+
+test('failed chat releases the guard for an explicit retry and clears its error after success', async () => {
+  let calls = 0;
+  const h = chatHarness(async () => {
+    if (++calls === 1) throw new Error('Synthetic unavailable');
+    return { answer: 'Recovered answer', sources: [] };
+  });
+  h.change('Synthetic question');
+  await h.submit();
+  assert.match(text(h.render()), /Synthetic unavailable/);
+  await h.submit();
+  assert.equal(calls, 2);
+  assert.doesNotMatch(text(h.render()), /Synthetic unavailable/);
+  assert.match(text(h.render()), /Recovered answer/);
+});
+
+for (const failure of [false, true]) {
+  test(`unmounted chat ignores late ${failure ? 'failure' : 'success'} and does not submit again`, async () => {
+    let finish, calls = 0;
+    const h = chatHarness(() => { calls++; return new Promise((resolve, reject) => {
+      finish = () => failure ? reject(new Error('Late failure')) : resolve({ answer: 'Late answer', sources: [] });
+    }); });
+    h.change('Synthetic question');
+    const unmount = h.effects[0]();
+    const request = h.submit();
+    unmount();
+    const before = JSON.stringify(h.values.slice(0, 5));
+    finish();
+    await request;
+    assert.equal(JSON.stringify(h.values.slice(0, 5)), before);
+    await h.submit();
+    assert.equal(calls, 1);
+  });
+}
+
+test('whitespace-only chat does not reach the API even when submitted directly', async () => {
+  let calls = 0;
+  const h = chatHarness(async () => { calls++; return { answer: 'Unexpected', sources: [] }; });
+  h.change(' \n\t ');
+  await h.submit();
+  assert.equal(calls, 0);
+  assert.equal(nodes(h.render()).find(node => node.props?.type === 'submit').props.disabled, true);
 });
