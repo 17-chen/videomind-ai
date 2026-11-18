@@ -15,7 +15,7 @@ from app.database.session import SessionLocal
 from app.models.transcript import Transcript
 from app.models.video import Video, VideoStatus
 from app.services.video_processing.audio import extract_audio
-from app.services.video_processing.downloader import download_video
+from app.services.video_processing.managed_downloader import download_video
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.subtitles import find_downloaded_subtitles
 from app.services.video_processing.transcriber import ensure_local_asr_available, transcribe_audio

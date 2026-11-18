@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-18：R5/R8 URL下载与合并接入独立受控进程组，父进程采样阶段空间/超时，Worker退出后下载器停止自身组，返回前停止组并回收组长再清理/发布。真实本地HTTP、DASH/ffmpeg故障与模拟ASR重试覆盖新增12项，最终441项后端测试/Ruff通过。云API/前端健康200，队列空闲，两Worker仍停止；未重跑视频或调用模型。用户反馈基础账号隔离正常，Key/检索/越权具体验证范围未确认。全局空间预留、长期多实例和真实恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-18.md)。
+
 2026-11-17 后续预览恢复：用户报告注册页打不开，已恢复现有 Colima 4GB；云前端3001 /auth与API8002 readiness均200。恢复前临时拦住Worker入口，随后明确停止videomind-preview-worker与videomind-worker，再逐字节恢复原源码；未领取/重跑任务。队列只读queued/running/failed/expired均0、succeeded=1。当前仅注册/登录所需云前端/API运行，Worker保持停止，旧3000/8001演示未恢复。
 
 2026-11-17：功能 `f4d80e9` 已同步 GitHub，[CI 44001063110](https://github.com/17-chen/videomind-ai/actions/runs/44001063110) 前后端及固定检索检查全部通过。R2/R8 问答表单增加同步在途保护，同一挂载实例只允许一个未完成请求；空白问题不请求、失败可显式重试、卸载后忽略迟到结果。回答标注实际提交问题，草稿可继续编辑。19项前端回归及临时副本build/typecheck/lint通过，API为模拟；预览两文件经基线核对同步，Colima未运行，未调用模型/重跑视频。跨标签页/服务端幂等、真实双账号/引用/恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-17.md)。
@@ -30,7 +32,7 @@
 
 2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
 
-> 最后核对：2026-11-17。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-18。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 

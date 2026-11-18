@@ -82,6 +82,8 @@ flowchart TD
 
 需要 Git 和可用的 **Docker Engine / Compose v2**；Docker Desktop 或已配置的 Colima 均可。容器外开发才需要宿主 Node.js / Python。
 
+URL视频处理使用Linux后端容器。下载/合并监督需要 `waitid/WNOWAIT`；Python3.12原生macOS缺少该接口，会明确拒绝而不回退未监督下载。见 [临时空间与进程边界](docs/TEMPORARY_STORAGE.md)。
+
 ```bash
 git clone https://github.com/17-chen/videomind-ai.git
 cd videomind-ai

@@ -39,6 +39,8 @@ FastAPI /api/v1
 
 1. 前端提交 Bilibili/抖音 URL 或分享文本，或上传本地视频；后端创建归属于当前用户的 Video 记录。上传使用服务端 ID 命名、哈希防本人重复及 ffprobe 内容校验。
 2. `POST /videos/{id}/process` 创建持久任务，由 Worker 执行：URL 视频由 yt-dlp 下载并优先解析字幕；本地上传直接读取本人已保存文件。没有字幕时提取音频并调用配置的 ASR Provider；转写存入 Transcript。
+
+   URL 下载/合并由独立 Python 进程组执行，Worker按阶段空间/耗时采样监督并在返回前停止该组；下载器观察Worker父PID退出。私有配置通过匿名FD传递，不占用长SQL锁，不改变队列/模型归属规则。支持边界见 [临时空间保护](TEMPORARY_STORAGE.md)。
 3. `POST /videos/{id}/analyze` 使用 LangGraph Video Analysis Agent 和 DeepSeek，生成结构化 Summary 与 Markdown 笔记。
 4. `POST /videos/{id}/embed` 拼接视频、转写和摘要文本，默认用 local_hash 生成向量；可选 bge_zh 对长文档分段。向量写入 Chroma，PostgreSQL 保存视频级向量 ID。
 5. `POST /chat` 按 user_id 检索 Chroma 结果，再调用 DeepSeek 生成中文回答并返回视频来源。

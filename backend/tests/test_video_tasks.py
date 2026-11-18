@@ -361,7 +361,7 @@ def test_run_retry_after_vector_failure_reuses_transcript_and_summary(task_api, 
 def test_media_error_is_safe_in_database_api_and_logs_and_can_be_retried(task_api, monkeypatch, failed_stage):
     from app.core.i18n import t
     from app.services.storage_quota import artifact_directory
-    from app.services.video_processing import pipeline, transcriber
+    from app.services.video_processing import pipeline, transcriber, downloader
     from app.services.video_processing.types import ExtractedAudio
 
     client, engine = task_api
@@ -387,6 +387,9 @@ def test_media_error_is_safe_in_database_api_and_logs_and_can_be_retried(task_ap
             return str(self.path)
 
     monkeypatch.setitem(sys.modules, 'yt_dlp', SimpleNamespace(YoutubeDL=FakeYDL))
+    # This privacy test injects an in-process library error. Managed process
+    # lifecycle/transport is exercised with real tools in separate tests.
+    monkeypatch.setattr(pipeline, 'download_video', downloader.download_video)
     monkeypatch.setattr(pipeline, 'find_downloaded_subtitles', lambda **_: None)
     def personal_key(user):
         assert user.email == 'alice@example.com'

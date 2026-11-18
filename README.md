@@ -82,6 +82,8 @@ Jobs survive API restarts. Cancellation takes effect between stages, not during 
 
 Install Git and a working **Docker Engine with Compose v2**. Docker Desktop or configured Colima can be used. Host Node.js/Python installations are only needed for development outside containers.
 
+URL video processing uses the Linux backend container. Download/merge supervision requires `waitid/WNOWAIT`; Python 3.12 on native macOS lacks this API and fails closed rather than running an unsupervised download. See [temporary storage and process boundaries](docs/TEMPORARY_STORAGE.md).
+
 ```bash
 git clone https://github.com/17-chen/videomind-ai.git
 cd videomind-ai
