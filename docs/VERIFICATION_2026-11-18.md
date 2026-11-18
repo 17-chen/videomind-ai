@@ -12,6 +12,8 @@ Worker到下载器的控制参数经私有匿名临时文件/FD传递，不出�
 
 ## 验证证据
 
+功能 `96c7768` 已同步 GitHub，[CI 44272962036](https://github.com/17-chen/videomind-ai/actions/runs/44272962036) 前后端及固定检索检查全部通过。命令行状态监视曾因GitHub网络超时退出，随后通过GitHub连接器读取该运行的两项job及各步骤均success，未重跑工作流。
+
 - 最终源码 **441项后端测试**及 `ruff check app tests scripts` 全部通过，三组 PostgreSQL/pgvector/对象 opt-in 检查启用。一次性 PostgreSQL16、无外网/业务卷/真实配置，源码临时副本与合成数据；仅已有LangGraph弃用警告。前端未改，不重复本地前端构建，GitHub CI仍覆盖前后端及固定检索。
 - 新增12项：真实DASH/yt-dlp/ffmpeg合并过程中Worker SIGKILL和SIGTERM；合并在途低空间、探测异常、容量及超时；相对暂存路径正常发布；没有进度回调的阻塞HTTP超时；真实HTTP404及超大元信息失败；缺系统接口拒绝启动；损坏/缺失子进程结果帧的固定错误与回收。
 - 故障任务使用独立Worker和SQLite队列，真实本地HTTP与ffmpeg；ASR响应及Key解析为模拟，不调用外部模型。低空间/探测错误为模拟反馈；容量用本次私有暂存中额外稀疏文件触发真实总量检查，没有实际填满磁盘。超时使用真实短预算。
