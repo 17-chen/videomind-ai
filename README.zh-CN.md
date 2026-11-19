@@ -215,6 +215,8 @@ npm run dev
 
 在隔离副本执行 `npm run build`、`npm run typecheck`、`npm run lint`。不要在正在运行 dev 服务的目录执行生产构建，见 [AGENTS.md](AGENTS.md)、[项目交接](PROJECT_HANDOFF.md)。
 
+`cd frontend && npm run test:e2e` 自动建立临时副本，用真实Chromium和合成回环API检查生产界面自动更新，不需要账号或模型调用。隔离、报告及验收边界见 [浏览器验收说明](docs/BROWSER_ACCEPTANCE.md)。
+
 停止应用使用 `docker compose --profile app down`；保留数据时应保留 PostgreSQL 卷、`storage/` 与主密钥，不通过删除卷排错。
 
 ## 仓库结构与文档

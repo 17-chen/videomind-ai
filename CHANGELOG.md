@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-19：R2/R5/R8 新增真实 Chromium 生产界面合成验收，覆盖入队后笔记自动出现、终态停止轮询、失败显式重试、取消和问答引用导航；21项前端单元回归、4项浏览器用例及临时副本 build/typecheck/lint通过。测试使用独立回环假API，不读取账号或调用模型；真实Supabase/Whisper/DeepSeek全过程、引用质量及完整恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-19.md) 与 [运行说明](docs/BROWSER_ACCEPTANCE.md)。
+
 2026-11-18：R5/R8 URL下载与合并接入独立受控进程组，父进程采样阶段空间/超时，Worker退出后下载器停止自身组，返回前停止组并回收组长再清理/发布。真实本地HTTP、DASH/ffmpeg故障与模拟ASR重试覆盖新增12项，最终441项后端测试/Ruff通过。云API/前端健康200，队列空闲，两Worker仍停止；未重跑视频或调用模型。用户反馈基础账号隔离正常，Key/检索/越权具体验证范围未确认。全局空间预留、长期多实例和真实恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-18.md)。
 
 2026-11-17 后续预览恢复：用户报告注册页打不开，已恢复现有 Colima 4GB；云前端3001 /auth与API8002 readiness均200。恢复前临时拦住Worker入口，随后明确停止videomind-preview-worker与videomind-worker，再逐字节恢复原源码；未领取/重跑任务。队列只读queued/running/failed/expired均0、succeeded=1。当前仅注册/登录所需云前端/API运行，Worker保持停止，旧3000/8001演示未恢复。

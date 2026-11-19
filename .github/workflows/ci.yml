@@ -89,3 +89,20 @@ jobs:
         run: npm run typecheck
       - name: Lint frontend
         run: npm run lint
+      - name: Install isolated browser test tools
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/videomind-browsers
+        run: npx playwright install --with-deps chromium --only-shell
+      - name: Verify production UI against the synthetic API in a temporary copy
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/videomind-browsers
+          VIDEOMIND_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/videomind-browser-results
+        run: npm run test:e2e
+      - name: Save synthetic browser report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: synthetic-browser-report
+          path: ${{ runner.temp }}/videomind-browser-results
+          if-no-files-found: ignore
+          retention-days: 7

@@ -215,6 +215,8 @@ npm run dev
 
 In an isolated frontend copy, run `npm run build`, `npm run typecheck`, and `npm run lint`. Avoid production builds in a running development server's directory; see [AGENTS.md](AGENTS.md) and the [handoff (中文)](PROJECT_HANDOFF.md).
 
+`cd frontend && npm run test:e2e` builds a temporary copy and checks production UI updates in real Chromium against a synthetic loopback API, without accounts or model calls. See [browser acceptance](docs/BROWSER_ACCEPTANCE.md) for isolation, reports and limits.
+
 Stop the stack with `docker compose --profile app down`. Preserve the PostgreSQL volume, `storage/`, and encryption key when retaining data. Do not delete volumes as a reset shortcut.
 
 ## Repository map and documentation

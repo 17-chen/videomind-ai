@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:deployment": "node scripts/check-deployment.mjs",
-    "build:deploy": "npm run check:deployment && npm run build"
+    "build:deploy": "npm run check:deployment && npm run build",
+    "test:e2e": "node scripts/run-browser-checks.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
@@ -25,6 +26,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
