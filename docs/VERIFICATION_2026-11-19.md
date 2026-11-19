@@ -20,6 +20,6 @@ macOS ARM64、Node 24.16.0，Playwright 1.65.1 / Chromium Headless Shell 159.0.8
 
 只读检查3001/auth=200；云前端/API容器运行，云与旧演示Worker均exited。8002 readiness首轮15秒超时；放宽至45秒的第二次请求返回200。仅记录重查可用，不声称响应延迟已解决。未为检查启动Worker或调用模型，预览业务代码无需更新。
 
-本轮后端未修改，因此未在本机重复441项后端测试；GitHub CI会执行后端pytest/Ruff、固定hash检索以及前端/浏览器检查，实际结果另记。
+本轮后端未修改，因此未在本机重复441项后端测试；功能提交 `1329d44` 的 [GitHub CI 44495053602](https://github.com/17-chen/videomind-ai/actions/runs/44495053602) 前后端全部通过：Linux前端单元/构建/类型/lint及生产副本浏览器验收、后端pytest/Ruff与固定hash检索检查。
 
 真实3001从新任务到正文的Whisper/DeepSeek链、真实问答引用准确性、Key/检索/越权/会话逐项双账号验证、用户数据库和文件完整隔离恢复仍待验收。用户此前仅反馈基础账号隔离正常，不扩展为整项完成。
