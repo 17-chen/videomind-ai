@@ -1,6 +1,8 @@
 # VideoMind AI 完整交接文档
 
-## 当前交接：2026-11-19（优先于下方历史记录）
+## 当前交接：2026-11-20（优先于下方历史记录）
+
+2026-11-20：R2/R7 问答模型错误改用中英文固定提示，区分本人Key/权限、额度/频率、超时、连接、其他SDK错误及空正文，失败不再伪装成功返回来源。上游认证失败返回502而非本站登录401；纯空白问题在检索、调用和额度计数前返回422。新增25项API回归，隔离PostgreSQL下466项后端测试/Ruff通过；模拟HTTP/SDK与隔离SQL检查结果见 [本轮核查](docs/VERIFICATION_2026-11-20.md)。未调用真实模型、重跑视频或改主密钥；真实服务验收仍待做。
 
 2026-11-19：功能 `1329d44` 已同步 GitHub，[CI 44495053602](https://github.com/17-chen/videomind-ai/actions/runs/44495053602) 前后端全部通过，含Linux生产界面浏览器合成验收、后端pytest/Ruff与固定hash检索检查。R2/R5/R8 新增真实 Chromium 生产界面合成验收，覆盖入队后笔记自动出现、终态停止轮询、失败显式重试、取消和问答引用导航；21项前端单元回归、4项浏览器用例及临时副本 build/typecheck/lint通过。测试使用独立回环假API，不读取账号或调用模型；真实Supabase/Whisper/DeepSeek全过程、引用质量及完整恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-19.md) 与 [运行说明](docs/BROWSER_ACCEPTANCE.md)。
 
@@ -38,7 +40,8 @@
 - **本机私有配置：**`~/Library/Application Support/VideoMind AI/` 中 `.env.preview.local`、frontend-public.json、launch-backend.py、launch-frontend.cjs、frontend-preview、证书、状态文件、模型与备份；不回显、不提交真实配置。3001 前端来自私有源码副本，后续改前端须将相关源码同步到该副本并验证，单改仓库不会自动更新 3001。不要全量覆盖或带入 .env/旧 .next。
 - **资源/回退：**用户已授权 Colima 扩容至 4GB，Docker socket `unix:///Users/chenxin/.colima/default/docker.sock`。旧云 API/Worker 保存在带 `-before-local-asr-20261108` 后缀的停止容器，禁止与新 Worker 同时启动。重启前先核对活动队列；不删除数据卷、不重建加密主密钥。
 - **下一步顺序：**自动更新浏览器全程复核 → 当前账号真实笔记/问答引用与本人模型错误路径 → 第二真实账号数据/Key 隔离 → 删除/重启持久性及隔离恢复 → 受保护公网预发布。R6 旧文件迁移/pending 安全解决、R8 并发空间/统一限流与监控、R1 中文质量/真实性能仍未完成。
-- **本轮增量（2026-11-19）：**仅前端开发依赖、合成浏览器测试、CI与文档；无需同步3001业务源码。`cd frontend && npm run test:e2e`自动建立临时副本，报告独立保留。后端源码未变，本机未重跑后端全量检查；本次CI后端检查通过。前端3001/auth实测200，两个Worker仍停止；API8002首次15秒就绪请求超时，放宽至45秒重查返回200；未重启服务。
+- **本轮增量（2026-11-20）：**新增25项问答API回归，466项后端测试/Ruff通过。队列只读仅succeeded=1、无活动任务后仅重载云API；readiness与登录页200、匿名chat401，两个Worker仍exited；无模型调用或数据变更。前端源码未改，无需同步私有前端副本。真实问答/双账号详细权限/完整恢复仍待验收。
+- **此前增量（2026-11-19）：**仅前端开发依赖、合成浏览器测试、CI与文档；无需同步3001业务源码。`cd frontend && npm run test:e2e`自动建立临时副本，报告独立保留。后端源码未变，本机未重跑后端全量检查；本次CI后端检查通过。前端3001/auth实测200，两个Worker仍停止；API8002首次15秒就绪请求超时，放宽至45秒重查返回200；未重启服务。
 - **保护现状：**原未跟踪 `outputs/`、`backend/:memory:.ses` 保留，不读取内容、不提交、不清理。本轮新增隔离浏览器验收、CI与文档；新聊天以实际 Git/运行检查为准，历史发布授权不替代新请求。
 
 证据：[真实 Supabase 基础接入](docs/VERIFICATION_2026-11-08_SUPABASE.md)、[本地转写运行](docs/VERIFICATION_2026-11-08_LOCAL_ASR.md)、[登录/时间/终态 UI](docs/VERIFICATION_2026-11-08_UI.md)。

@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from app.database.base import Base
 from app.models import User, Video
@@ -24,7 +25,7 @@ def hit(video_id, document='Synthetic evidence', title='Synthetic title'):
 
 @pytest.fixture
 def library(monkeypatch):
-    engine = create_engine('sqlite+pysqlite://')
+    engine = create_engine('sqlite+pysqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         alice = User(email='rag-alice@example.com', password_hash='synthetic')
@@ -124,3 +125,129 @@ def test_database_verification_failure_never_falls_back_to_index(library, monkey
     with pytest.raises(SQLAlchemyError):
         rag.chat_with_videos(db, alice, 'Question', 5)
     assert prompts == []
+
+
+@pytest.fixture
+def chat_api(library):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.dependencies import get_db, get_current_user
+    from app.api.v1.routes.chat import router
+    from app.core.errors import register_exception_handlers
+
+    db, alice, (first, _, _), candidates, _, _ = library
+    candidates.append(hit(first.id))
+    api = FastAPI()
+    api.include_router(router, prefix='/chat')
+    register_exception_handlers(api)
+    api.dependency_overrides[get_db] = lambda: db
+    api.dependency_overrides[get_current_user] = lambda: alice
+    with TestClient(api) as client:
+        yield client
+
+
+@pytest.mark.parametrize('language', ['zh', 'en'])
+@pytest.mark.parametrize('upstream,expected', [
+    (401, 502), (403, 502), (429, 503), (500, 502), (422, 502),
+    ('timeout', 504), ('connection', 503),
+])
+def test_provider_failures_return_actionable_safe_http_errors(chat_api, library, monkeypatch, language, upstream, expected):
+    import httpx
+    from openai import OpenAI
+
+    calls = []
+    def respond(request):
+        calls.append(request)
+        if upstream == 'timeout':
+            raise httpx.ReadTimeout('SENSITIVE_PROVIDER_BODY', request=request)
+        if upstream == 'connection':
+            raise httpx.ConnectError('SENSITIVE_PROVIDER_BODY', request=request)
+        return httpx.Response(upstream, json={'error': {'message': 'SENSITIVE_PROVIDER_BODY', 'type': 'synthetic'}}, request=request)
+
+    with OpenAI(api_key='synthetic-user-key', max_retries=0,
+                http_client=httpx.Client(transport=httpx.MockTransport(respond))) as model:
+        monkeypatch.setattr(rag, 'get_llm_client', lambda user: (model, 'synthetic-model'))
+        response = chat_api.post('/chat', json={'question': 'Question', 'language': language})
+    assert response.status_code == expected
+    detail = response.json()['detail']
+    assert ('model' in detail) if language == 'en' else ('模型' in detail)
+    assert 'SENSITIVE_PROVIDER_BODY' not in response.text
+    assert 'synthetic-user-key' not in response.text
+    assert 'sources' not in response.json()
+    assert len(calls) == 1  # This application error handler does not resubmit.
+    assert calls[0].headers['authorization'] == 'Bearer synthetic-user-key'
+    assert library[-1] == []
+
+
+@pytest.mark.parametrize('content', [None, '', ' \n\t'])
+def test_empty_provider_answer_is_not_reported_as_success(chat_api, monkeypatch, content):
+    def complete(**kwargs):
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    monkeypatch.setattr(rag, 'get_llm_client', lambda user: (
+        SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=complete))), 'synthetic-model',
+    ))
+    response = chat_api.post('/chat', json={'question': 'Question'})
+    assert response.status_code == 502
+    assert '有效正文' in response.json()['detail']
+
+
+def test_no_choices_is_a_provider_failure(chat_api, monkeypatch):
+    monkeypatch.setattr(rag, 'get_llm_client', lambda user: (
+        SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: SimpleNamespace(choices=[])))), 'synthetic-model',
+    ))
+    assert chat_api.post('/chat', json={'question': 'Question'}).status_code == 502
+
+
+@pytest.mark.parametrize('question', ['', ' ', '\n\t', '\u3000'])
+def test_blank_question_never_retrieves_or_calls_provider(chat_api, library, question):
+    from app.models.request_window import RequestWindow
+
+    response = chat_api.post('/chat', json={'question': question})
+    assert response.status_code == 422
+    assert library[-2] == []
+    assert library[-1] == []
+    assert library[0].query(RequestWindow).count() == 0
+
+
+def test_question_is_trimmed_before_retrieval_and_prompt(chat_api, library):
+    response = chat_api.post('/chat', json={'question': '  Question \n'})
+    assert response.status_code == 200
+    assert library[-2][0]['query'] == 'Question'
+    assert library[-1][0]['messages'][1]['content'].startswith('用户问题：Question\n')
+
+
+def test_provider_error_can_be_retried_explicitly_without_losing_sources(chat_api, library, monkeypatch):
+    import httpx
+    from openai import OpenAI
+
+    calls = []
+    def respond(request):
+        calls.append(request)
+        if len(calls) == 1:
+            return httpx.Response(401, json={'error': {'message': 'SENSITIVE_PROVIDER_BODY'}}, request=request)
+        return httpx.Response(200, json={'id': 'synthetic', 'created': 0, 'model': 'synthetic-model',
+            'object': 'chat.completion', 'choices': [{'index': 0, 'finish_reason': 'stop',
+            'message': {'role': 'assistant', 'content': 'Recovered answer [1]'}}]}, request=request)
+
+    with OpenAI(api_key='synthetic-user-key', max_retries=0,
+                http_client=httpx.Client(transport=httpx.MockTransport(respond))) as model:
+        monkeypatch.setattr(rag, 'get_llm_client', lambda user: (model, 'synthetic-model'))
+        assert chat_api.post('/chat', json={'question': 'Question'}).status_code == 502
+        response = chat_api.post('/chat', json={'question': 'Question'})
+    assert response.status_code == 200
+    assert response.json()['answer'] == 'Recovered answer [1]'
+    assert [source['video_id'] for source in response.json()['sources']] == [library[2][0].id]
+    assert len(calls) == 2
+
+
+def test_missing_own_key_still_never_uses_owner_configuration(chat_api, monkeypatch):
+    from app.core.config import settings
+    from app.services.ai_provider import get_llm_client
+
+    monkeypatch.setattr(settings, 'auth_mode', 'supabase')
+    monkeypatch.setattr(settings, 'deepseek_api_key', 'synthetic-owner-key-never-use')
+    monkeypatch.setattr(rag, 'get_llm_client', get_llm_client)
+    response = chat_api.post('/chat', json={'question': 'Question'})
+    assert response.status_code == 400
+    assert '自己的模型' in response.json()['detail']
+    assert 'synthetic-owner-key' not in response.text

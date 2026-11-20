@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class VideoEmbedResponse(BaseModel):
@@ -10,6 +10,11 @@ class VideoEmbedResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000, title="问题")
+    @field_validator("question", mode="before")
+    @classmethod
+    def strip_question(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
     limit: int = Field(default=5, ge=1, le=10, title="检索数量")
     language: Literal["zh", "en"] = "zh"
 
