@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-21：R6/R8 对象账本核查新增本地归档模式，只读校验已导出对象的大小/SHA-256，拒绝符号链接和特殊文件，复用分批预算、并发账本变化检测及pending保护；PostgreSQL受RLS过滤的视图拒绝判定，避免空结果误报。本机489项全量及Ruff通过，最后参数边界补充后75项归档/SQL定向及Ruff再通过。未操作真实备份、主密钥、模型或任务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-21.md) 与 [归档说明](docs/OBJECT_ARCHIVE_VERIFICATION.md)。
+
 2026-11-20：功能 `6b923a6` 已同步 GitHub，[CI 44663031292](https://github.com/17-chen/videomind-ai/actions/runs/44663031292) 前后端、Chromium验收及固定hash检索检查全部通过。R2/R7 问答模型错误改用中英文固定提示，区分本人Key/权限、额度/频率、超时、连接、其他SDK错误及空正文，失败不再伪装成功返回来源。上游认证失败返回502而非本站登录401；纯空白问题在检索、调用和额度计数前返回422。新增25项API回归，隔离PostgreSQL下466项后端测试/Ruff通过；模拟HTTP/SDK与隔离SQL检查结果见 [本轮核查](docs/VERIFICATION_2026-11-20.md)。未调用真实模型、重跑视频或改主密钥；真实服务验收仍待做。
 
 2026-11-19：功能 `1329d44` 已同步 GitHub，[CI 44495053602](https://github.com/17-chen/videomind-ai/actions/runs/44495053602) 前后端全部通过，含Linux生产界面浏览器合成验收、后端pytest/Ruff与固定hash检索检查。R2/R5/R8 新增真实 Chromium 生产界面合成验收，覆盖入队后笔记自动出现、终态停止轮询、失败显式重试、取消和问答引用导航；21项前端单元回归、4项浏览器用例及临时副本 build/typecheck/lint通过。测试使用独立回环假API，不读取账号或调用模型；真实Supabase/Whisper/DeepSeek全过程、引用质量及完整恢复仍待验收。见 [本轮核查](docs/VERIFICATION_2026-11-19.md) 与 [运行说明](docs/BROWSER_ACCEPTANCE.md)。

@@ -630,3 +630,62 @@ def test_object_audit_read_only_snapshot_and_concurrent_change(object_db):
             assert readonly == ['on']
     finally:
         event.remove(engine, 'before_cursor_execute', check_mode)
+
+
+def test_local_export_archive_matches_restored_ledger_and_detects_tampering(object_db, tmp_path):
+    import hashlib
+    from app.services.object_storage.archive import ObjectArchive
+    from app.services.object_storage.audit import audit_objects
+    from app.services.object_storage.repository import SPEC_FIELDS
+    from app.services.object_storage.spec import ArtifactSpec
+
+    engine, owner, videos = object_db
+    data = b'synthetic restored object'
+    spec = ArtifactSpec(id=str(uuid4()), user_id=owner, video_id=videos[0], kind='note',
+        filename=f'{videos[0]}.md', bucket='synthetic', project_fingerprint='0' * 64,
+        sha256=hashlib.sha256(data).hexdigest(), size_bytes=len(data))
+    file = tmp_path / spec.project_fingerprint / spec.bucket / spec.object_key
+    file.parent.mkdir(parents=True)
+    file.write_bytes(data)
+    with Session(engine) as db:
+        db.add(StoredArtifact(**{name: getattr(spec, name) for name in SPEC_FIELDS}, state='ready'))
+        db.commit()
+    archive = ObjectArchive(tmp_path)
+    try:
+        with Session(engine) as db:
+            good = audit_objects(db, store=archive)
+            assert good['status'] == 'observed' and good['remote']['matched'] == 1
+            file.write_bytes(b'X' * len(data))
+            bad = audit_objects(db, store=archive)
+            assert bad['status'] == 'needs_attention' and bad['remote']['mismatch'] == 1
+            assert db.get(StoredArtifact, spec.id).state == 'ready'
+            assert bad['writes_performed'] is False
+    finally:
+        archive.close()
+
+
+
+def test_object_audit_rejects_row_security_filtered_ledger(object_db):
+    from app.services.object_storage.audit import audit_objects
+
+    engine, *_ = object_db
+    role = 'vm_archive_reader_' + uuid4().hex[:12]
+    with engine.begin() as connection:
+        connection.exec_driver_sql(f'CREATE ROLE "{role}" NOLOGIN')
+        connection.exec_driver_sql(f'GRANT USAGE ON SCHEMA public TO "{role}"')
+        connection.exec_driver_sql(f'GRANT SELECT ON vm_storage_objects, videos TO "{role}"')
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql(f'SET ROLE "{role}"')
+            connection.commit()
+            try:
+                with Session(bind=connection) as db:
+                    with pytest.raises(ValueError, match='unfiltered backend view'):
+                        audit_objects(db)
+            finally:
+                connection.exec_driver_sql('RESET ROLE')
+                connection.commit()
+    finally:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f'DROP OWNED BY "{role}"')
+            connection.exec_driver_sql(f'DROP ROLE "{role}"')

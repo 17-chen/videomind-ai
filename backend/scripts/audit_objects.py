@@ -8,6 +8,7 @@ import json
 
 from app.database.session import SessionLocal
 from app.services.object_storage.audit import audit_objects
+from app.services.object_storage.archive import ObjectArchive
 from app.services.object_storage.supabase import SupabaseObjectStore
 
 
@@ -18,9 +19,17 @@ def _bounded(value, minimum, maximum):
     return number
 
 
+def _archive_root(value):
+    if not value.strip():
+        raise argparse.ArgumentTypeError('Archive root must not be empty')
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--verify-remote', action='store_true', help='Read exact keys and verify size/SHA-256; may incur provider egress charges')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--archive-root', type=_archive_root, help='Verify an existing local export only; never contacts object storage')
+    mode.add_argument('--verify-remote', action='store_true', help='Read exact keys and verify size/SHA-256; may incur provider egress charges')
     parser.add_argument('--limit', type=lambda value: _bounded(value, 1, 100), default=20)
     parser.add_argument('--offset', type=lambda value: _bounded(value, 0, 1000000), default=0,
                         help='Skip rows in UUID order; only use across batches while writers are stopped')
@@ -32,8 +41,8 @@ def main(argv=None):
         with SessionLocal() as db:
             # Default and uninstalled schema never instantiate a cloud client.
             report = audit_objects(db)
-            if args.verify_remote and report['status'] != 'not_installed':
-                store = SupabaseObjectStore.from_settings()
+            if (args.verify_remote or args.archive_root) and report['status'] != 'not_installed':
+                store = ObjectArchive(args.archive_root) if args.archive_root else SupabaseObjectStore.from_settings()
                 report = audit_objects(db, store=store, limit=args.limit, max_bytes=args.max_mb * 1024 * 1024, offset=args.offset)
     except Exception:
         report = {'status': 'error', 'reason': 'object_audit_failed', 'writes_performed': False, 'observations_only': True}
@@ -43,6 +52,10 @@ def main(argv=None):
                 store.close()
             except Exception:
                 report = {'status': 'error', 'reason': 'object_audit_failed', 'writes_performed': False, 'observations_only': True}
+    if args.archive_root:
+        report['verification_target'] = 'local_archive'
+        if 'remote' in report:
+            report['archive'] = report.pop('remote')
     print(json.dumps(report, sort_keys=True))
     return 2 if report['status'] in ('needs_attention', 'error') else 0
 

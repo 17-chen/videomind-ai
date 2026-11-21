@@ -323,3 +323,189 @@ def test_invalid_ledger_metadata_is_redacted_before_remote_io(ledger):
     report = audit_objects(db, store=MustNotRead())
     assert report['remote']['failed'] == 1 and 'sentinel' not in json.dumps(report)
     assert db.get(StoredArtifact, spec.id).filename == '../private-sentinel'
+
+
+def archive_file(root, spec, data):
+    path = root / spec.project_fingerprint / spec.bucket / spec.object_key
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return path
+
+
+@pytest.mark.parametrize('data,expected', [
+    (b'original', 'matched'), (b'changed!', 'mismatch'), (b'short', 'mismatch'),
+    (b'original-longer', 'mismatch'), (None, 'absent'),
+])
+def test_local_archive_verifies_exact_bytes_without_writes(tmp_path, monkeypatch, data, expected):
+    from app.services.object_storage.archive import ObjectArchive
+
+    root = tmp_path / 'export'
+    root.mkdir()
+    spec = spec_for(b'original')
+    if data is not None:
+        file = archive_file(root, spec, data)
+        before = file.stat()
+    monkeypatch.setattr(settings, 'max_media_stage_mb', 0)
+    archive = ObjectArchive(root)
+    try:
+        assert archive.verify(spec) == expected
+        if data is not None:
+            after = file.stat()
+            assert (before.st_ino, before.st_size, before.st_mtime_ns) == (after.st_ino, after.st_size, after.st_mtime_ns)
+            assert file.read_bytes() == data
+    finally:
+        archive.close()
+        archive.close()
+
+
+def test_empty_local_archive_file_and_project_partition(tmp_path):
+    from app.services.object_storage.archive import ObjectArchive
+
+    spec = spec_for(b'')
+    archive_file(tmp_path, spec, b'')
+    archive = ObjectArchive(tmp_path)
+    try:
+        assert archive.verify(spec) == 'matched'
+        assert archive.verify(replace(spec, project_fingerprint='0' * 64)) == 'absent'
+    finally:
+        archive.close()
+    with pytest.raises(ValueError):
+        archive.verify(spec)
+
+
+@pytest.mark.parametrize('part', ['project', 'bucket', 'file'])
+def test_archive_never_follows_export_symlinks(tmp_path, part):
+    from app.services.object_storage.archive import ObjectArchive
+
+    root = tmp_path / 'export'
+    spec = spec_for(b'original')
+    file = archive_file(root, spec, b'original')
+    source = {'project': root / spec.project_fingerprint, 'bucket': root / spec.project_fingerprint / spec.bucket, 'file': file}[part]
+    outside = tmp_path / 'outside'
+    source.rename(outside)
+    source.symlink_to(outside, target_is_directory=outside.is_dir())
+    archive = ObjectArchive(root)
+    try:
+        with pytest.raises(OSError):
+            archive.verify(spec)
+    finally:
+        archive.close()
+
+
+def test_archive_rejects_root_and_root_ancestor_symlink(tmp_path):
+    from app.services.object_storage.archive import ObjectArchive
+
+    root = tmp_path / 'real'
+    root.mkdir()
+    (root / 'child').mkdir()
+    link = tmp_path / 'link'
+    link.symlink_to(root, target_is_directory=True)
+    for path in (link, link / 'child'):
+        with pytest.raises(OSError):
+            ObjectArchive(path)
+
+
+@pytest.mark.parametrize('kind', ['fifo', 'directory'])
+def test_archive_rejects_nonregular_files_without_reading(tmp_path, monkeypatch, kind):
+    import os
+    from app.services.object_storage.archive import ObjectArchive
+
+    spec = spec_for(b'original')
+    path = archive_file(tmp_path, spec, b'original')
+    path.unlink()
+    if kind == 'fifo':
+        os.mkfifo(path)
+    else:
+        path.mkdir()
+    monkeypatch.setattr(os, 'read', lambda *args: pytest.fail('Must not read special files'))
+    archive = ObjectArchive(tmp_path)
+    try:
+        with pytest.raises(ValueError):
+            archive.verify(spec)
+    finally:
+        archive.close()
+
+
+def test_archive_detects_file_replacement_while_hashing(tmp_path, monkeypatch):
+    import os
+    from app.services.object_storage.archive import ObjectArchive
+
+    spec = spec_for(b'original')
+    path = archive_file(tmp_path, spec, b'original')
+    real_read = os.read
+    changed = []
+    def read(fd, size):
+        data = real_read(fd, size)
+        if not changed:
+            replacement = path.with_suffix('.replacement')
+            replacement.write_bytes(b'original')
+            replacement.replace(path)
+            changed.append(True)
+        return data
+    monkeypatch.setattr(os, 'read', read)
+    archive = ObjectArchive(tmp_path)
+    try:
+        assert archive.verify(spec) == 'mismatch'
+    finally:
+        archive.close()
+
+
+@pytest.mark.parametrize('state,data,exit_code,outcome', [
+    ('ready', b'original', 0, 'matched'), ('pending', b'original', 2, 'matched'),
+    ('retired', None, 2, 'absent'), ('deleted', b'original', 2, 'deleted_present'),
+    ('deleted', None, 0, 'deleted_absent'),
+])
+def test_archive_cli_only_reads_and_preserves_intents(ledger, tmp_path, monkeypatch, capsys, state, data, exit_code, outcome):
+    db, engine, owner, video = ledger
+    spec = add_row(db, owner, video, state=state, data=b'original')
+    root = tmp_path / 'export'
+    root.mkdir()
+    if data is not None:
+        archive_file(root, spec, data)
+    monkeypatch.setattr(cli, 'SessionLocal', lambda: Session(engine))
+    monkeypatch.setattr(SupabaseObjectStore, 'from_settings', lambda: pytest.fail('Local verification must not create cloud client'))
+    assert cli.main(['--archive-root', str(root)]) == exit_code
+    output = capsys.readouterr().out
+    report = json.loads(output)
+    assert report['verification_target'] == 'local_archive' and 'remote' not in report
+    assert report['archive'][outcome] == 1
+    assert report['writes_performed'] is False and report['observations_only'] is True
+    assert all(value not in output for value in (str(root), owner, video, spec.id, spec.bucket, spec.sha256))
+    db.expire_all()
+    assert db.get(StoredArtifact, spec.id).state == state
+
+
+def test_archive_cli_missing_root_is_redacted(ledger, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, 'SessionLocal', lambda: Session(ledger[1]))
+    assert cli.main(['--archive-root', str(tmp_path / 'private-sentinel')]) == 2
+    output = capsys.readouterr().out
+    assert json.loads(output)['status'] == 'error'
+    assert 'private-sentinel' not in output and str(tmp_path) not in output
+
+
+def test_archive_and_remote_modes_are_mutually_exclusive():
+    with pytest.raises(SystemExit) as exc:
+        cli.main(['--archive-root', '/synthetic', '--verify-remote'])
+    assert exc.value.code == 2
+
+
+def test_archive_budget_skip_never_opens_a_file(ledger, tmp_path, monkeypatch):
+    from app.services.object_storage.archive import ObjectArchive
+
+    db, _, owner, video = ledger
+    spec = add_row(db, owner, video, state='ready', data=b'original')
+    archive = ObjectArchive(tmp_path)
+    monkeypatch.setattr(archive, 'verify', lambda spec: pytest.fail('No read after budget exhausted'))
+    try:
+        report = audit_objects(db, store=archive, max_bytes=spec.size_bytes + BLOCK_SIZE - 1)
+        assert report['remote']['skipped_budget'] == 1
+        assert report['status'] == 'needs_attention'
+    finally:
+        archive.close()
+
+
+@pytest.mark.parametrize('root', ['', '   '])
+def test_empty_archive_root_does_not_fall_back_to_ledger_preview(root):
+    with pytest.raises(SystemExit) as error:
+        cli.main(['--archive-root', root])
+    assert error.value.code == 2

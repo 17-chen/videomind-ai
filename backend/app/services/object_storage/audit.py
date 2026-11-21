@@ -1,6 +1,6 @@
 """Read-only, bounded ledger/remote observations. Never resolves upload intent."""
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, select, text
 
 from app.models import Video
 from app.services.object_storage.cleanup import ledger_installed
@@ -51,6 +51,10 @@ def audit_objects(db, *, store=None, limit=20, max_bytes=512 * 1024 * 1024, offs
         # PostgreSQL enforces read-only even if a future query accidentally writes.
         if db.bind.dialect.name == 'postgresql':
             db.connection().exec_driver_sql('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
+            if ledger_installed(db) and db.scalar(text(
+                "SELECT row_security_active('vm_storage_objects'::regclass) OR row_security_active('videos'::regclass)"
+            )):
+                raise ValueError('Object audit requires an unfiltered backend view')
         report = ledger_snapshot(db)
         report['remote'] = {'enabled': store is not None, 'selected': 0, 'attempted': 0, 'matched': 0, 'absent': 0,
                             'mismatch': 0, 'failed': 0, 'deleted_absent': 0, 'deleted_present': 0, 'changed_during_check': 0, 'skipped_budget': 0,
