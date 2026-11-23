@@ -13,7 +13,7 @@ R6/R8 对象维护共用 PostgreSQL 完整视图检查。此前只读 audit_obje
 - 无外网、无业务卷的一次性 PostgreSQL 16/pgvector 与临时后端源码副本中运行 `python -m pytest -q`：501项通过（84.87秒），三组PostgreSQL opt-in全部启用。仅既有LangGraph弃用警告。结束只移除本次测试容器和临时副本。
 - `ruff check app tests scripts` 通过；`git diff --check` 通过。
 - 新增10项回归：账本/视频分别受限 × 预览/执行/CLI预览/CLI执行，共8项；初始预览后及首个删除提交后切入受限角色，共2项。真实存在的视频、对象和删除意图保留；初始受限不创建provider，后续受限不继续删，之前已确认删除保留。
-- 前端未改，本机未重复构建；推送后通过GitHub CI复核前后端、Chromium与固定hash检索，结果将在本文件补充。
+- 前端未改，本机未重复构建；功能提交 `fa7c1e3` 的 [CI 45207598215](https://github.com/17-chen/videomind-ai/actions/runs/45207598215) 前后端全部通过，含后端pytest/Ruff/固定hash检索、前端单元/build/typecheck/lint及Chromium生产界面合成验收。
 
 ## 边界与下一步
 
