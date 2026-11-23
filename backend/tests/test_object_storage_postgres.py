@@ -689,3 +689,112 @@ def test_object_audit_rejects_row_security_filtered_ledger(object_db):
         with engine.begin() as connection:
             connection.exec_driver_sql(f'DROP OWNED BY "{role}"')
             connection.exec_driver_sql(f'DROP ROLE "{role}"')
+
+
+@pytest.fixture
+def filtered_cleanup_role(object_db):
+    engine, *_ = object_db
+    role = 'vm_cleanup_filtered_' + uuid4().hex[:12]
+    with engine.begin() as connection:
+        connection.exec_driver_sql(f'CREATE ROLE "{role}" NOLOGIN')
+        connection.exec_driver_sql(f'GRANT USAGE ON SCHEMA public TO "{role}"')
+        connection.exec_driver_sql(f'GRANT SELECT, UPDATE ON vm_storage_objects TO "{role}"')
+        connection.exec_driver_sql(f'GRANT SELECT ON videos TO "{role}"')
+    try:
+        yield role
+    finally:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f'DROP OWNED BY "{role}"')
+            connection.exec_driver_sql(f'DROP ROLE "{role}"')
+
+
+@pytest.mark.parametrize('filtered_table', ['videos', 'vm_storage_objects'])
+@pytest.mark.parametrize('operation', ['snapshot', 'apply', 'cli_preview', 'cli_apply'])
+def test_cleanup_rejects_rls_hidden_rows_before_provider_io(
+    object_db, filtered_cleanup_role, tmp_path, monkeypatch, capsys, filtered_table, operation,
+):
+    import json
+    from app.services.object_storage.cleanup import cleanup_requested_objects, cleanup_snapshot
+    from scripts import cleanup_objects
+
+    engine, owner, ids = object_db
+    path = tmp_path / f'{ids[0]}.md'
+    path.write_bytes(b'synthetic-restored-object')
+    store = DeletionTestStore()
+    with Session(engine) as db:
+        spec = publish_artifact(db, user_id=owner, video_id=ids[0], kind='note', path=path, store=store)
+        # A restored video must block an old deletion intent, even if RLS hides it.
+        row = db.get(StoredArtifact, spec.id)
+        row.state, row.delete_requested = 'retired', True
+        db.commit()
+    with engine.begin() as connection:
+        if filtered_table == 'videos':
+            connection.exec_driver_sql('ALTER TABLE videos ENABLE ROW LEVEL SECURITY')
+            connection.exec_driver_sql('CREATE POLICY synthetic_visible_ledger ON vm_storage_objects USING (true)')
+        # Ledger RLS is already enabled by its migration. No policy hides all rows.
+    with engine.connect() as connection:
+        connection.exec_driver_sql(f'SET ROLE "{filtered_cleanup_role}"')
+        connection.commit()
+        try:
+            assert connection.scalar(text(f'SELECT count(*) FROM {filtered_table}')) == 0
+            connection.commit()
+            if operation.startswith('cli_'):
+                monkeypatch.setattr(cleanup_objects, 'SessionLocal', lambda: Session(bind=connection))
+                monkeypatch.setattr(cleanup_objects.SupabaseObjectStore, 'from_settings',
+                                    lambda: pytest.fail('Filtered preview must not instantiate a provider'))
+                assert cleanup_objects.main(['--apply'] if operation == 'cli_apply' else []) == 2
+                assert json.loads(capsys.readouterr().out) == {
+                    'status': 'error', 'reason': 'object_cleanup_failed', 'writes_may_have_occurred': False,
+                }
+            else:
+                with Session(bind=connection) as db:
+                    with pytest.raises(ValueError, match='unfiltered backend view'):
+                        if operation == 'snapshot':
+                            cleanup_snapshot(db)
+                        else:
+                            cleanup_requested_objects(db, store=store)
+        finally:
+            connection.rollback()
+            connection.exec_driver_sql('RESET ROLE')
+            connection.commit()
+    with Session(engine) as db:
+        assert db.get(Video, ids[0]) is not None
+        assert db.get(StoredArtifact, spec.id).state == 'retired'
+    assert store.delete_calls == 0 and spec.object_key in store.keys
+
+
+@pytest.mark.parametrize('restricted_transaction', [2, 3])
+def test_cleanup_rechecks_visibility_for_each_deletion_transaction(
+    object_db, filtered_cleanup_role, tmp_path, monkeypatch, restricted_transaction,
+):
+    from sqlalchemy import event
+    from app.services.object_storage.cleanup import cleanup_requested_objects
+
+    engine, owner, ids = object_db
+    _, store, _ = prepare_deleted_object(object_db, tmp_path, monkeypatch)
+    path = tmp_path / f'{ids[1]}.md'
+    path.write_bytes(b'synthetic-second-object')
+    with Session(engine) as db:
+        spec = publish_artifact(db, user_id=owner, video_id=ids[1], kind='note', path=path, store=store)
+        row = db.get(StoredArtifact, spec.id)
+        row.state, row.delete_requested = 'retired', True
+        db.delete(db.get(Video, ids[1]))
+        db.commit()
+    with engine.begin() as connection:
+        connection.exec_driver_sql('ALTER TABLE videos ENABLE ROW LEVEL SECURITY')
+        connection.exec_driver_sql('CREATE POLICY synthetic_visible_ledger ON vm_storage_objects USING (true)')
+    transactions = []
+    with Session(engine) as db:
+        def restrict_later_transaction(session, transaction, connection):
+            transactions.append(True)
+            if len(transactions) == restricted_transaction:
+                connection.exec_driver_sql(f'SET LOCAL ROLE "{filtered_cleanup_role}"')
+        event.listen(db, 'after_begin', restrict_later_transaction)
+        with pytest.raises(ValueError, match='unfiltered backend view'):
+            cleanup_requested_objects(db, store=store)
+    expected_deletions = restricted_transaction - 2
+    assert store.delete_calls == expected_deletions
+    assert len(store.keys) == 2 - expected_deletions
+    with Session(engine) as db:
+        assert len(db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'deleted')).all()) == expected_deletions
+        assert len(db.scalars(select(StoredArtifact).where(StoredArtifact.state == 'retired')).all()) == 2 - expected_deletions

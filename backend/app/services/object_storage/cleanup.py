@@ -4,7 +4,7 @@ Only confirmed uploads (retired) are eligible. Pending uploads are never inferre
 safe to delete from their age, a 404, or the absence of their video.
 """
 
-from sqlalchemy import exists, func, inspect, select
+from sqlalchemy import exists, func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
@@ -17,6 +17,19 @@ def ledger_installed(db: Session) -> bool:
     connection = db.connection()
     schema = 'public' if connection.dialect.name == 'postgresql' else None
     return inspect(connection).has_table(StoredArtifact.__tablename__, schema=schema)
+
+
+def require_unfiltered_view(db: Session) -> None:
+    """Maintenance must never infer absence from RLS-hidden rows.
+
+    Call only after confirming the ledger exists, and in every transaction that
+    selects deletion candidates. Do not change roles or disable row security.
+    """
+    if db.bind.dialect.name == 'postgresql' and db.scalar(text(
+        "SELECT row_security_active('public.vm_storage_objects'::regclass) "
+        "OR row_security_active('public.videos'::regclass)"
+    )):
+        raise ValueError('Object maintenance requires an unfiltered backend view')
 
 
 def stage_video_deletion(db: Session, video: Video) -> None:
@@ -54,6 +67,7 @@ def _eligible():
 def cleanup_snapshot(db: Session) -> dict:
     if not ledger_installed(db):
         return {'status': 'not_installed', 'eligible': 0, 'pending_uncertain': 0, 'blocked': 0}
+    require_unfiltered_view(db)
 
     def count(condition):
         return db.scalar(select(func.count()).select_from(StoredArtifact).where(condition))
@@ -86,6 +100,7 @@ def cleanup_requested_objects(db: Session, *, store, limit: int = 20) -> dict:
     db.rollback()  # Finish the read-only snapshot before individual recovery transactions.
     seen = []
     for _ in range(limit):
+        require_unfiltered_view(db)
         row = db.scalar(select(StoredArtifact).where(_eligible(), StoredArtifact.id.not_in(seen))
                         .order_by(StoredArtifact.id).limit(1).with_for_update(skip_locked=True))
         if row is None:

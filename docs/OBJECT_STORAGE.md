@@ -78,6 +78,8 @@ python -m scripts.cleanup_objects --apply --limit 20 # 明确执行，最多 20 
 
 只处理 `delete_requested=true AND state=retired` 且同 ID 视频不存在的对象；按精确、不可变键删除并通过认证读取确认 404，再提交 deleted。失败保留意图，下次显式重试；删除不占用媒体缓存，因此不受后来调低的本地阶段文件上限阻挡，上传/下载仍受限；不按前缀批量删，也不因文件年龄或视频缺失推断删除权限。即使是标记过的对象，若手工恢复了同 ID 视频也会阻止清理。
 
+PostgreSQL 维护角色必须能完整读取账本和 videos；预览和每次选取清理对象前都检查有效 RLS，任一表受 RLS 过滤则停止并返回固定脱敏错误，禁止把不可见视频当成已删除。工具不切换角色、不关闭 RLS、不扩大权限；请使用既有可信后端角色。已在之前事务确认的删除不会因后续视图受限而撤销，CLI 的 writes_may_have_occurred 会如实标记。此检查不能阻止管理员在同一事务检查后并发修改策略，维护期间仍须冻结角色/策略与恢复写入。
+
 PostgreSQL 每次只锁一个对象，`SKIP LOCKED` 防止维护进程同时删除同一对象；网络期间不持有用户或视频锁，但仍占用对象行锁与数据库连接。每批次数有上限，不等于整个命令的严格时间上限；SQLite 仅用于隔离用例，不作为多维护进程方案。
 
 输出只有聚合数量：eligible、pending_uncertain、blocked、attempted、confirmed_deleted、failed、writes_performed 和 status。退出 0 为正常只读预览、未安装或本批全部完成；退出 2 为错误、执行后仍有积压/失败/阻止项或结果不明项。预览可列出 eligible>0 而仍退出 0；需另看计数，不把 0 当作没有副本。

@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-23：R6/R8 对象清理补完整视图保护，预览及每次清理事务拒绝账本/videos 受有效 RLS 过滤，避免将不可见视频误判已删除或隐藏账本误报为空；与只读核查共用检查。新增10项真实PostgreSQL受限角色/事务回归，501项后端测试及Ruff通过。对象传输为合成替身，未执行真实云删除、调用模型、启动Worker或重启服务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-23.md)。
+
 2026-11-21：功能 `3d57311` 已同步 GitHub，[CI 44866458202](https://github.com/17-chen/videomind-ai/actions/runs/44866458202) 前后端、Chromium及固定hash检索检查全部通过。R6/R8 对象账本核查新增本地归档模式，只读校验已导出对象的大小/SHA-256，拒绝符号链接和特殊文件，复用分批预算、并发账本变化检测及pending保护；PostgreSQL受RLS过滤的视图拒绝判定，避免空结果误报。本机489项全量及Ruff通过，最后参数边界补充后75项归档/SQL定向及Ruff再通过。未操作真实备份、主密钥、模型或任务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-21.md) 与 [归档说明](docs/OBJECT_ARCHIVE_VERIFICATION.md)。
 
 2026-11-20：功能 `6b923a6` 已同步 GitHub，[CI 44663031292](https://github.com/17-chen/videomind-ai/actions/runs/44663031292) 前后端、Chromium验收及固定hash检索检查全部通过。R2/R7 问答模型错误改用中英文固定提示，区分本人Key/权限、额度/频率、超时、连接、其他SDK错误及空正文，失败不再伪装成功返回来源。上游认证失败返回502而非本站登录401；纯空白问题在检索、调用和额度计数前返回422。新增25项API回归，隔离PostgreSQL下466项后端测试/Ruff通过；模拟HTTP/SDK与隔离SQL检查结果见 [本轮核查](docs/VERIFICATION_2026-11-20.md)。未调用真实模型、重跑视频或改主密钥；真实服务验收仍待做。
@@ -38,7 +40,7 @@
 
 2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
 
-> 最后核对：2026-11-18。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-23。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 
