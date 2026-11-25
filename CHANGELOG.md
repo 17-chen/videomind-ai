@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-25：R8新增离线事务式用户密钥轮换工具，默认只读全量预检；显式执行使用PostgreSQL表锁、RLS完整视图检查、固定public表与写后密文核验，提交前失败整体回滚。新增40项回归，最终541项后端测试及Ruff通过；均为合成密钥/隔离数据库，现有主密钥未读取或轮换，真实配置切换/完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-25.md) 与 [轮换说明](docs/KEY_ROTATION.md)。
+
 2026-11-23：功能 `fa7c1e3` 已同步 GitHub，[CI 45207598215](https://github.com/17-chen/videomind-ai/actions/runs/45207598215) 前后端、Chromium及固定hash检索检查全部通过。R6/R8 对象清理补完整视图保护，预览及每次清理事务拒绝账本/videos 受有效 RLS 过滤，避免将不可见视频误判已删除或隐藏账本误报为空；与只读核查共用检查。新增10项真实PostgreSQL受限角色/事务回归，501项后端测试及Ruff通过。对象传输为合成替身，未执行真实云删除、调用模型、启动Worker或重启服务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-23.md)。
 
 2026-11-21：功能 `3d57311` 已同步 GitHub，[CI 44866458202](https://github.com/17-chen/videomind-ai/actions/runs/44866458202) 前后端、Chromium及固定hash检索检查全部通过。R6/R8 对象账本核查新增本地归档模式，只读校验已导出对象的大小/SHA-256，拒绝符号链接和特殊文件，复用分批预算、并发账本变化检测及pending保护；PostgreSQL受RLS过滤的视图拒绝判定，避免空结果误报。本机489项全量及Ruff通过，最后参数边界补充后75项归档/SQL定向及Ruff再通过。未操作真实备份、主密钥、模型或任务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-21.md) 与 [归档说明](docs/OBJECT_ARCHIVE_VERIFICATION.md)。
