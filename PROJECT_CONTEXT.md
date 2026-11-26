@@ -1,5 +1,7 @@
 # 项目上下文
 
+2026-11-26：R8新增默认关闭的同盘临时空间协作预留，生成/上传/对象缓存按活动预算准入，下载与音频子进程继承预留描述符；自动笔记在准入后调用模型。新增40项回归，84项定向及581项全量后端测试/Ruff通过。仅合成数据与真实本地锁/进程/媒体，实际余量部分使用替身；现有环境未启用、未重启服务或调用模型，真实挂载/长期多实例与全盘硬配额仍待验收。见 [核查](docs/VERIFICATION_2026-11-26.md) 与 [说明](docs/TEMPORARY_RESERVATIONS.md)。
+
 2026-11-25：功能 `76ef111` 已同步 GitHub，[CI 45619028927](https://github.com/17-chen/videomind-ai/actions/runs/45619028927) 前后端、Chromium及固定hash检索检查全部通过。R8新增离线事务式用户密钥轮换工具，默认只读全量预检；显式执行使用PostgreSQL表锁、RLS完整视图检查、固定public表与写后密文核验，提交前失败整体回滚。新增40项回归，最终541项后端测试及Ruff通过；均为合成密钥/隔离数据库，现有主密钥未读取或轮换，真实配置切换/完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-25.md) 与 [轮换说明](docs/KEY_ROTATION.md)。
 
 2026-11-23：功能 `fa7c1e3` 已同步 GitHub，[CI 45207598215](https://github.com/17-chen/videomind-ai/actions/runs/45207598215) 前后端、Chromium及固定hash检索检查全部通过。R6/R8 对象清理补完整视图保护，预览及每次清理事务拒绝账本/videos 受有效 RLS 过滤，避免将不可见视频误判已删除或隐藏账本误报为空；与只读核查共用检查。新增10项真实PostgreSQL受限角色/事务回归，501项后端测试及Ruff通过。对象传输为合成替身，未执行真实云删除、调用模型、启动Worker或重启服务；真实完整恢复仍待验收。见 [核查](docs/VERIFICATION_2026-11-23.md)。
@@ -42,7 +44,7 @@
 
 2026-11-08 运行补充：用户授权 Colima 4GB 扩容后，独立云预览前端 3001/API 8002/Worker 已运行；真实 HTTP ready=200、匿名 videos=401、云队列 queued/running/failed/expired=0，原本地 3000/8001 已恢复。Site URL=3001。功能 `57c0794` 的 CI 42452665353 前后端通过；双账号/本人模型仍未验收，见 [接入记录](docs/VERIFICATION_2026-11-08_SUPABASE.md)。
 
-> 最后核对：2026-11-25。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
+> 最后核对：2026-11-26。优先以仓库代码、Git 状态和本次实测为准；不记录真实密钥。完整文档索引见 [项目资料入口](docs/PROJECT_MATERIALS.md)。
 
 **文档入口更新（2026-10-27）：**默认 `README.md` 为英文首页，`README.zh-CN.md` 为对应中文首页；原 README 保存在 `docs/archive/README.before-bilingual.zh-CN.md`，仅作历史参考。此次只修改文档，功能和真实服务验收状态未因此改变。
 

@@ -21,17 +21,23 @@ def analyze_video(db: Session, video: Video, *, object_store=None) -> Summary:
         output_dir.mkdir(parents=True, exist_ok=True)
         ensure_free_space(output_dir)
 
-    analysis, markdown_note = analyze_video_transcript(
-        transcript=video.transcript.content,
-        user=video.user,
-        video_title=video.title,
-    )
+    def analyze():
+        return analyze_video_transcript(transcript=video.transcript.content, user=video.user, video_title=video.title)
+
     if video.summary is None or not video.summary.note_is_manual:
-        generate_artifacts(db, video, "note", lambda: _persist_markdown_note(video.id, markdown_note),
-                           object_store=object_store, object_on_publish=lambda _: _apply_analysis(db, video, analysis, markdown_note))
+        def produce():
+            result, note = analyze()
+            _persist_markdown_note(video.id, note)
+            return result, note
+        analysis, markdown_note = generate_artifacts(
+            db, video, "note", produce, object_store=object_store,
+            object_on_publish=lambda result: _apply_analysis(db, video, *result),
+        )
         if object_store is not None:
             db.refresh(video.summary)
             return video.summary
+    else:
+        analysis, markdown_note = analyze()
     summary = _apply_analysis(db, video, analysis, markdown_note)
     db.commit()
     db.refresh(summary)

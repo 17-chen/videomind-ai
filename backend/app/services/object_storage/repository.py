@@ -21,6 +21,7 @@ from app.services.object_storage.models import StoredArtifact
 from app.services.object_storage.spec import ArtifactSpec, UNAVAILABLE, measure_file
 from app.services.storage_quota import STORAGE_LIMIT_MESSAGE, user_storage_bytes
 from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, stage_limit_bytes
+from app.services.temporary_reservations import reserve_temporary_space
 
 
 SPEC_FIELDS = tuple(ArtifactSpec.__dataclass_fields__)
@@ -128,7 +129,7 @@ def materialize_artifact(db: Session, *, user_id: str, artifact_id: str, cache_r
     row = _owned_artifact(db, user_id, artifact_id, ('ready',))
     spec = spec_for(row)
     cache_root.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(prefix='.object-read-', dir=cache_root) as directory:
+    with reserve_temporary_space(cache_root, spec.size_bytes), TemporaryDirectory(prefix='.object-read-', dir=cache_root) as directory:
         path = Path(directory) / spec.filename
         store.download(spec, path)
         yield path
@@ -171,7 +172,7 @@ def materialize_artifacts(db: Session, *, user_id: str, video_id: str, kind: str
     if len(specs) > 100 or sum(spec.size_bytes for spec in specs) > stage_limit_bytes():
         raise ApiError(STAGE_LIMIT_MESSAGE, 413)
     cache_root.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(prefix='.object-group-', dir=cache_root) as directory:
+    with reserve_temporary_space(cache_root, sum(spec.size_bytes for spec in specs)), TemporaryDirectory(prefix='.object-group-', dir=cache_root) as directory:
         root = Path(directory)
         files = {}
         for spec in specs:

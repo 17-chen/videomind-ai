@@ -15,6 +15,7 @@ from app.core.errors import ApiError
 from app.core.i18n import t
 from app.services.storage_quota import artifact_directory
 from app.services.temporary_storage import check_stage_space
+from app.services.temporary_reservations import reservation_descriptors
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import DownloadedVideo
 
@@ -50,7 +51,7 @@ def download_video(url: str, video_id: str) -> DownloadedVideo:
             [sys.executable, '-m', 'app.services.video_processing.download_runner',
              str(os.getpid()), str(outgoing.fileno())],
             stdin=incoming, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            pass_fds=(outgoing.fileno(),), start_new_session=True,
+            pass_fds=(outgoing.fileno(), *reservation_descriptors()), start_new_session=True,
         )
         response = None
         try:

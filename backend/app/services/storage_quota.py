@@ -22,7 +22,8 @@ from app.core.config import settings
 from app.core.errors import ApiError
 from app.models.user import User
 from app.models.video import Video
-from app.services.temporary_storage import check_stage_space, ensure_free_space
+from app.services.temporary_storage import check_stage_space, ensure_free_space, stage_limit_bytes
+from app.services.temporary_reservations import reserve_temporary_space
 
 
 ARTIFACT_KINDS = ("video", "audio", "transcript", "note")
@@ -104,7 +105,7 @@ def staging_directory(kind: str) -> Iterator[Path]:
     root = Path(getattr(settings, f"{kind}_storage_dir"))
     root.mkdir(parents=True, exist_ok=True)
     ensure_free_space(root)
-    with TemporaryDirectory(prefix=".staging-", dir=root) as directory:
+    with reserve_temporary_space(root, stage_limit_bytes()), TemporaryDirectory(prefix=".staging-", dir=root) as directory:
         path = Path(directory)
         token = _staging.set({**_staging.get(), kind: path})
         try:

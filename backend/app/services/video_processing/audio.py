@@ -10,6 +10,7 @@ from app.services.storage_quota import artifact_directory
 from app.core.i18n import t
 from app.core.errors import ApiError
 from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, ensure_free_space, stage_limit_bytes
+from app.services.temporary_reservations import reservation_descriptors
 from app.services.video_processing.errors import VideoProcessingError
 from app.services.video_processing.types import ExtractedAudio
 
@@ -17,7 +18,9 @@ from app.services.video_processing.types import ExtractedAudio
 def _run_audio_command(command: list[str], output_dir: Path) -> int:
     timeout = settings.audio_extraction_timeout_seconds
     # No pipes: raw tool output is neither shown nor accumulated in memory.
-    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    inherited = reservation_descriptors()
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               **({'pass_fds': inherited} if inherited else {}))
     deadline = monotonic() + timeout
     try:
         while process.poll() is None:

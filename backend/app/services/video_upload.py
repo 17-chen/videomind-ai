@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.video import Video, VideoStatus
 from app.services.storage_quota import check_storage_quota, staging_directory
 from app.services.temporary_storage import STAGE_LIMIT_MESSAGE, ensure_free_space, stage_limit_bytes
+from app.services.temporary_reservations import reserve_temporary_space
 
 
 UPLOAD_EXTENSIONS = (".mp4", ".webm", ".mkv", ".mov", ".m4v")
@@ -78,46 +79,47 @@ def save_uploaded_video(db: Session, user: User, file: UploadFile, title: str | 
     storage_dir.mkdir(parents=True, exist_ok=True)
     partial_path = storage_dir / f"{video_id}.part"
     final_path = storage_dir / f"{video_id}{extension}"
-    committed = False
-    try:
-        byte_count, checksum = _write_upload(file, partial_path)
-        duration = _probe_video(partial_path)
-        if db.scalar(select(Video.id).where(Video.user_id == user.id, Video.upload_sha256 == checksum)):
-            raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT)
-
-        _check_user_upload_quota(db, user, byte_count)
-        check_storage_quota(db, user.id, byte_count)
-
-        os.replace(partial_path, final_path)
-        video = Video(
-            id=video_id,
-            user_id=user.id,
-            url=f"upload://{video_id}",
-            title=title.strip() if title and title.strip() else "本地上传的视频",
-            duration=duration,
-            status=VideoStatus.CREATED.value,
-            source="upload",
-            tags=[],
-            media_path=str(final_path),
-            upload_sha256=checksum,
-        )
-        db.add(video)
+    with reserve_temporary_space(storage_dir, min(settings.max_upload_mb * 1024 * 1024, stage_limit_bytes())):
+        committed = False
         try:
-            db.commit()
-        except IntegrityError as exc:
-            db.rollback()
-            if "uq_videos_user_upload_sha256" in str(exc.orig) or "videos.user_id, videos.upload_sha256" in str(exc.orig):
-                raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT) from exc
+            byte_count, checksum = _write_upload(file, partial_path)
+            duration = _probe_video(partial_path)
+            if db.scalar(select(Video.id).where(Video.user_id == user.id, Video.upload_sha256 == checksum)):
+                raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT)
+
+            _check_user_upload_quota(db, user, byte_count)
+            check_storage_quota(db, user.id, byte_count)
+
+            os.replace(partial_path, final_path)
+            video = Video(
+                id=video_id,
+                user_id=user.id,
+                url=f"upload://{video_id}",
+                title=title.strip() if title and title.strip() else "本地上传的视频",
+                duration=duration,
+                status=VideoStatus.CREATED.value,
+                source="upload",
+                tags=[],
+                media_path=str(final_path),
+                upload_sha256=checksum,
+            )
+            db.add(video)
+            try:
+                db.commit()
+            except IntegrityError as exc:
+                db.rollback()
+                if "uq_videos_user_upload_sha256" in str(exc.orig) or "videos.user_id, videos.upload_sha256" in str(exc.orig):
+                    raise ApiError("你已经上传过这个视频", status.HTTP_409_CONFLICT) from exc
+                raise
+            committed = True
+            db.refresh(video)
+            return video
+        except Exception:
+            if not committed:
+                db.rollback()
+                partial_path.unlink(missing_ok=True)
+                final_path.unlink(missing_ok=True)
             raise
-        committed = True
-        db.refresh(video)
-        return video
-    except Exception:
-        if not committed:
-            db.rollback()
-            partial_path.unlink(missing_ok=True)
-            final_path.unlink(missing_ok=True)
-        raise
 
 
 def _write_upload(file: UploadFile, path: Path) -> tuple[int, str]:
