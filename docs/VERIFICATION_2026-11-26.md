@@ -8,7 +8,7 @@ R8新增MEDIA_RESERVATION_DIR（默认空）及同盘协作准入。私有POSIX�
 
 ## 检查证据
 
-最终定向84项测试和Ruff通过（6.49秒）；`python -m pytest -q` 完整581项通过（92.82秒），三组PostgreSQL opt-in全部启用；`ruff check app tests scripts` 及 `git diff --check` 通过，仅已有LangGraph弃用警告。前端未改，本机未重复构建；推送后CI结果另补。最初定向修正了一处测试模型导入路径及夹具导入Lint提示。
+最终定向84项测试和Ruff通过（6.49秒）；`python -m pytest -q` 完整581项通过（92.82秒），三组PostgreSQL opt-in全部启用；`ruff check app tests scripts` 及 `git diff --check` 通过，仅已有LangGraph弃用警告。前端未改，本机未重复构建；功能提交 `1e44d7e` 的 [CI 45793779799](https://github.com/17-chen/videomind-ai/actions/runs/45793779799) 前后端全部通过，含后端pytest/Ruff/固定hash检索、前端单元/build/typecheck/lint及Chromium生产界面合成验收。最初定向修正了一处测试模型导入路径及夹具导入Lint提示。
 
 新增40项覆盖同进程/跨真实Python进程竞争、进程kill后的预算恢复、活着的继承描述符保留预算、音频真实子进程继承、合法失效元数据回收且孤立媒体保留；根/祖先符号链接、权限、未知/损坏/超大/特殊/硬链接记录与登记锁拒绝；跨真实文件系统拒绝、条目上限、锁忙、清理错误及缺锁接口不回退。集成检查覆盖生成先拒绝、local/对象上传在读取服务层UploadFile前拒绝、模型调用前拒绝、手工笔记保留、对象单/组缓存精确预留，以及真实本地HTTP/yt-dlp下载成功并保留无关暂存。
 
