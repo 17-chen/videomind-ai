@@ -8,7 +8,7 @@ R8只读队列快照新增running租约不完整及未知任务状态聚合，ch
 
 ## 验证
 
-初版28项定向测试通过；修正测试函数的Lint写法后，干净检出中的 `python -m pytest -q` 全量598项通过（92.16秒），三组PostgreSQL opt-in全部启用，`ruff check app tests scripts` 与差异格式检查通过，仅既有LangGraph弃用警告。前端未改，本机未重复构建；CI结果另补。新增17项覆盖五种缺失/空白租约、未知状态脱敏、截止边界、三种脏Session拒绝、CLI聚合/脱敏、真实PostgreSQL下快照/运营/CLI的RLS拒绝及并发插入下一致只读快照。
+初版28项定向测试通过；修正测试函数的Lint写法后，干净检出中的 `python -m pytest -q` 全量598项通过（92.16秒），三组PostgreSQL opt-in全部启用，`ruff check app tests scripts` 与差异格式检查通过，仅既有LangGraph弃用警告。前端未改，本机未重复构建；功能提交 `e13451e` 的 [CI 45993381017](https://github.com/17-chen/videomind-ai/actions/runs/45993381017) 前后端全部通过，含pytest/Ruff/固定hash检索、前端单元/build/typecheck/lint及Chromium生产界面合成验收。新增17项覆盖五种缺失/空白租约、未知状态脱敏、截止边界、三种脏Session拒绝、CLI聚合/脱敏、真实PostgreSQL下快照/运营/CLI的RLS拒绝及并发插入下一致只读快照。
 
 ## 工作区与边界
 

@@ -1,6 +1,6 @@
 # Changelog
 
-2026-11-27：R8队列监控补只读一致事务和RLS完整视图检查，新增无效running租约/未知状态告警，快照CLI失败固定脱敏。新增17项回归，GitHub基线加本轮改动的598项全量测试/Ruff通过；原目录iCloud占位源码/Git对象仍不可读，未覆盖或reset，提交从独立临时检出完成，原目录历史/索引待恢复后核对。见 [核查](docs/VERIFICATION_2026-11-27.md)。
+2026-11-27：功能 `e13451e` 已同步GitHub，[CI 45993381017](https://github.com/17-chen/videomind-ai/actions/runs/45993381017)前后端、Chromium及固定hash检索全部通过。R8队列监控补只读一致事务和RLS完整视图检查，新增无效running租约/未知状态告警，快照CLI失败固定脱敏。新增17项回归，GitHub基线加本轮改动的598项全量测试/Ruff通过；原目录iCloud占位源码/Git对象仍不可读，未覆盖或reset，提交从独立临时检出完成，原目录历史/索引待恢复后核对。见 [核查](docs/VERIFICATION_2026-11-27.md)。
 
 2026-11-26：功能 `1e44d7e` 已同步 GitHub，[CI 45793779799](https://github.com/17-chen/videomind-ai/actions/runs/45793779799) 前后端、Chromium及固定hash检索检查全部通过。R8新增默认关闭的同盘临时空间协作预留，生成/上传/对象缓存按活动预算准入，下载与音频子进程继承预留描述符；自动笔记在准入后调用模型。新增40项回归，84项定向及581项全量后端测试/Ruff通过。仅合成数据与真实本地锁/进程/媒体，实际余量部分使用替身；现有环境未启用、未重启服务或调用模型，真实挂载/长期多实例与全盘硬配额仍待验收。见 [核查](docs/VERIFICATION_2026-11-26.md) 与 [说明](docs/TEMPORARY_RESERVATIONS.md)。
 
