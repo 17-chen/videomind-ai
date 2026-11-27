@@ -27,6 +27,7 @@ def queue(monkeypatch):
         for state in ('queued', 'running', 'failed'):
             video = Video(user=user, url='https://example.com/private', tags=[])
             db.add(VideoTask(video=video, user=user, kind='process', status=state,
+                worker_id='synthetic-worker' if state == 'running' else None,
                 created_at=NOW - timedelta(seconds=301),
                 lease_expires_at=NOW - timedelta(seconds=1) if state == 'running' else None,
                 finished_at=NOW - timedelta(minutes=30) if state == 'failed' else None,

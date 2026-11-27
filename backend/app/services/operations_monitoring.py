@@ -67,6 +67,10 @@ def operations_snapshot(
             alerts.append('expired_leases_exceeded')
         if queue['failed_last_hour'] > thresholds.max_failures_last_hour:
             alerts.append('recent_failures_exceeded')
+        if queue['invalid_running_leases']:
+            alerts.append('invalid_running_leases_detected')
+        if queue['unknown_status_tasks']:
+            alerts.append('unknown_task_status_detected')
         if alerts:
             checks['queue']['status'] = 'attention'
     except Exception:

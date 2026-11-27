@@ -1,5 +1,7 @@
 # 队列与本地磁盘阈值检查
 
+2026-11-27：队列快照改用只读一致事务、拒绝有效RLS过滤视图，新增租约完整性/未知状态告警；见 [核查](VERIFICATION_2026-11-27.md)。
+
 2026-11-10：R8 基础监控子项。`python -m scripts.check_operations` 只读查询队列、目录元数据及文件系统余量，输出聚合 JSON 和退出码；没有恢复任务、删除文件、释放额度或修改数据库的功能。不读取文件正文、密钥密文或服务商配置，不调用模型。
 
 ## 运行
@@ -33,10 +35,16 @@ MB=1024×1024 字节。允许非负整数；负数参数在读取前拒绝。最
 | `status` | 退出码 | 含义 |
 | --- | --- | --- |
 | `ok` | 0 | 本次选定检查均可读取，且没有超阈值 |
-| `attention` | 1 | 数据可读取，但至少一个阈值超限 |
+| `attention` | 1 | 数据可读取，但至少一个阈值超限或队列完整性异常 |
 | `unavailable` | 2 | 至少一项无法核对；即使其他项同时告警，也不能当作健康 |
 
-`checks.queue` 包含已有队列聚合字段，`checks.local_disk` 包含检查的文件系统数量、读取错误数及最小可用字节。`alerts` 使用固定代码：`queue_wait_exceeded`、`expired_leases_exceeded`、`recent_failures_exceeded`、`local_disk_free_below_minimum`。`unavailable` 使用 `queue_read_failed` 或 `local_disk_read_failed`，不返回异常原文、地址、路径或身份。`mutations_performed=false` 恒定。
+`checks.queue` 包含已有队列聚合字段，`checks.local_disk` 包含检查的文件系统数量、读取错误数及最小可用字节。`alerts` 使用固定代码：`queue_wait_exceeded`、`expired_leases_exceeded`、`recent_failures_exceeded`、`invalid_running_leases_detected`、`unknown_task_status_detected`、`local_disk_free_below_minimum`。`unavailable` 使用 `queue_read_failed` 或 `local_disk_read_failed`，不返回异常原文、地址、路径或身份。`mutations_performed=false` 恒定。
+
+队列新增 `invalid_running_leases`（running任务缺截止时间、缺worker或worker为空/只含空格）和 `unknown_status_tasks`（不属于queued/running/succeeded/failed/cancelled的任务）。任一计数为正直接attention，不由过期/失败阈值掩盖；不输出未知状态正文。租约截止时间等于检查时间时已计过期。
+
+PostgreSQL在干净专用Session中使用READ ONLY REPEATABLE READ并固定pg_catalog/public搜索路径，所有队列计数来自同一数据库快照；有效RLS过滤或无权限返回unavailable，不把受限空结果判为健康。已有调用者未提交的新建/修改/删除会拒绝，避免自动flush。结束只rollback，不修改任务。SQLite用于隔离单元测试，不宣称提供相同的跨连接快照保证。
+
+`task_queue_status`仍是原始快照命令，成功退出0不代表健康；异常改为固定脱敏JSON并退出2。需要阈值/完整性退出码时使用`check_operations`。
 
 数据库不可读时仍检查磁盘；某目录不可读时保留其他成功检查及低空间告警。video/audio/transcript/note 配置目录按文件系统设备去重；尚未创建的目录检查最近存在的父目录，不创建目录。配置位置为普通文件、断开的符号链接、无法读取或没有任何可检查根时标记 unavailable。此命令只检查容量，不扫描目录下的业务文件。
 
